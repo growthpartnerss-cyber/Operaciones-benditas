@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Benditarepa · Apertura y cierre</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBFAF6; --surface:#FFFFFF; --ink:#1C1813; --soft:#6B6357;
+  --line:#E6E1D6; --line2:#D6CFBF;
+  --maiz:#D98A00; --maiz2:#B87200; --maizT:#FCEFD3;
+  --ok:#2E7D46; --okT:#E4F0E7;
+  --warn:#C8880B; --warnT:#FBF0CE;
+  --bad:#C0392B; --badT:#F7E1DD;
+  --sh:0 1px 2px rgba(28,24,19,.05),0 6px 20px rgba(28,24,19,.06);
+  --r:14px;
+}
+:root:not([data-theme="light"]){@media (prefers-color-scheme:dark){
+  --paper:#17150F; --surface:#211E17; --ink:#F3EFE6; --soft:#A69C89;
+  --line:#332F26; --line2:#413C30;
+  --maizT:#3A2E12; --okT:#16261A; --warnT:#332A10; --badT:#2E1713;
+  --sh:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  --paper:#17150F; --surface:#211E17; --ink:#F3EFE6; --soft:#A69C89;
+  --line:#332F26; --line2:#413C30;
+  --maizT:#3A2E12; --okT:#16261A; --warnT:#332A10; --badT:#2E1713;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  background:var(--paper); color:var(--ink);
+  font:16px/1.45 'Inter',system-ui,-apple-system,sans-serif;
+  max-width:600px; margin:0 auto; padding:0 0 110px;
+}
+h1,h2,h3,.mono{font-family:'Space Grotesk','Inter',sans-serif}
+button{font-family:inherit;cursor:pointer}
+.hide{display:none!important}
+
+header{
+  position:sticky; top:0; z-index:30; background:var(--paper);
+  border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top,0px)) 16px 10px;
+}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hrow h1{font-size:15.5px;font-weight:700;margin:0;letter-spacing:-.01em}
+.hrow h1 .d{color:var(--maiz)}
+.hsub{font-size:11.5px;color:var(--soft);margin-top:1px}
+.ghost{font-size:12px;font-weight:600;color:var(--soft);background:none;border:1px solid var(--line2);border-radius:999px;padding:5px 11px}
+.ghost.on{color:var(--maiz2);border-color:var(--maiz);background:var(--maizT)}
+
+.roletabs{display:flex;gap:6px;margin-top:11px;background:var(--line);padding:4px;border-radius:12px}
+.roletabs button{flex:1;border:none;background:transparent;color:var(--soft);font-weight:600;font-size:13.5px;padding:8px 2px;border-radius:9px}
+.roletabs button.act{background:var(--surface);color:var(--ink);box-shadow:var(--sh)}
+.phasetabs{display:flex;gap:6px;margin-top:8px;background:var(--line);padding:4px;border-radius:12px}
+.phasetabs button{flex:1;border:none;background:transparent;color:var(--soft);font-weight:600;font-size:13.5px;padding:8px 2px;border-radius:9px}
+.phasetabs button.act{background:var(--surface);color:var(--ink);box-shadow:var(--sh)}
+
+main{padding:14px 16px 0}
+.sec{font-size:11px;font-weight:700;color:var(--soft);letter-spacing:.09em;text-transform:uppercase;margin:22px 2px 9px}
+.sec:first-child{margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--sh)}
+
+label.fl{font-size:11px;font-weight:600;color:var(--soft);display:block;margin-bottom:4px}
+input[type=text],select{width:100%;font:15px 'Inter',sans-serif;color:var(--ink);background:var(--surface);border:1px solid var(--line2);border-radius:10px;padding:10px;appearance:none}
+input:focus,select:focus{outline:2px solid var(--maiz);outline-offset:1px}
+
+/* Claim */
+.claimrole{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--line2);border-radius:11px;margin-bottom:8px;background:var(--surface)}
+.claimrole.sel{border-color:var(--maiz);background:var(--maizT)}
+.claimrole .bx{width:22px;height:22px;border:2px solid var(--line2);border-radius:6px;display:grid;place-items:center;color:#fff;font-size:13px;flex:none}
+.claimrole.sel .bx{background:var(--maiz);border-color:var(--maiz)}
+.claimrole .tt{font-weight:600;font-size:14.5px}
+.claimrole .ds{font-size:11.5px;color:var(--soft)}
+.claimrole.taken{opacity:.55}
+
+/* Llegada */
+.arr{border:1px solid var(--line2);border-radius:var(--r);padding:14px;background:var(--surface);box-shadow:var(--sh)}
+.arr.done{border-color:var(--ok);background:var(--okT)}
+.arr .hd{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;margin-bottom:10px}
+.tag{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--maiz2);background:var(--maizT);padding:3px 7px;border-radius:5px}
+.expwrap{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--soft);margin-bottom:12px}
+.expwrap input{width:88px;text-align:center;font-family:'Space Grotesk';font-size:15px}
+.bigbtn{width:100%;border:none;border-radius:11px;padding:14px;font:700 15px 'Space Grotesk';color:#fff;background:var(--maiz);box-shadow:var(--sh);display:flex;align-items:center;justify-content:center;gap:8px}
+.bigbtn:disabled{background:var(--line2);color:var(--soft);box-shadow:none}
+.bigbtn input{display:none}
+.arres{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.arres .t{font:700 24px 'Space Grotesk';line-height:1}
+.badge{font-size:12px;font-weight:700;padding:5px 10px;border-radius:7px;color:#fff}
+.badge.ok{background:var(--ok)} .badge.bad{background:var(--bad)}
+.arres img{width:44px;height:44px;border-radius:9px;object-fit:cover;border:1px solid var(--line2)}
+.arres .m{flex-basis:100%;font-size:11.5px;color:var(--soft)}
+
+/* Progress */
+.bar{height:7px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:12px}
+.bar>span{display:block;height:100%;width:0;background:var(--maiz);transition:width .3s}
+.bar.full>span{background:var(--ok)}
+.meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--soft);margin-top:6px}
+.meta .mono{font-family:'Space Grotesk'}
+
+ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.it{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;display:flex;gap:12px;align-items:flex-start}
+.it.on{border-color:var(--ok);background:var(--okT)}
+.it.crit{border-left:4px solid var(--bad)}
+.it.crit.on{border-left-color:var(--ok)}
+.it .bx{flex:0 0 26px;height:26px;border:2px solid var(--line2);border-radius:8px;display:grid;place-items:center;color:#fff;font-size:15px;background:var(--surface);margin-top:1px}
+.it.on .bx{background:var(--ok);border-color:var(--ok)}
+.it .lb{font-size:14.5px;font-weight:500;line-height:1.35}
+.ct{display:inline-block;font-size:9.5px;font-weight:700;color:var(--bad);background:var(--badT);border-radius:5px;padding:2px 6px;margin-left:6px;vertical-align:middle}
+.it.on .ct{color:var(--ok);background:transparent;padding-left:0}
+.st{font:600 12.5px 'Space Grotesk';color:var(--ok);margin-top:5px;display:none}
+.it.on .st{display:block}
+.ph{margin-top:9px;display:none;align-items:center;gap:9px;font-size:12px;color:var(--soft)}
+.it.crit.on .ph{display:flex}
+.phb{font-size:12px;font-weight:600;color:var(--maiz2);background:var(--maizT);border:1px solid var(--maiz);border-radius:8px;padding:6px 11px}
+.phb.has{color:var(--ok);background:var(--okT);border-color:var(--ok)}
+.ph input{display:none}
+.ph img{width:34px;height:34px;border-radius:7px;object-fit:cover}
+
+/* Tiles de estado (read-only para quien no responde) */
+.tile{display:flex;align-items:flex-start;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-bottom:8px}
+.tile .dot{width:13px;height:13px;border-radius:50%;flex:none;margin-top:4px;background:var(--line2)}
+.tile.ok{border-color:var(--ok);background:var(--okT)} .tile.ok .dot{background:var(--ok)}
+.tile.warn{border-color:var(--warn);background:var(--warnT)} .tile.warn .dot{background:var(--warn)}
+.tile .nm{font-weight:600;font-size:14.5px}
+.tile .mt{font-size:12px;color:var(--soft);margin-top:2px}
+.tile .det{font-size:13px;margin-top:6px;padding:8px 10px;background:rgba(0,0,0,.04);border-radius:8px}
+:root[data-theme="dark"] .tile .det,:root:not([data-theme="light"]) .tile .det{background:rgba(255,255,255,.06)}
+.lock{font-size:11px;color:var(--soft);margin-top:9px;display:flex;gap:6px;align-items:center}
+
+/* Agotados */
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.chip{font-size:12.5px;font-weight:600;background:var(--badT);color:var(--bad);border-radius:999px;padding:6px 11px;display:flex;align-items:center;gap:7px}
+.chip button{border:none;background:none;color:inherit;font-size:14px;line-height:1;padding:0}
+.addrow{display:flex;gap:8px;margin-top:10px}
+.addrow input{flex:1}
+.addrow button{border:1px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:10px;padding:0 16px;font-weight:600}
+
+/* Confirm block */
+.confirm{margin-top:22px}
+.cbtns{display:flex;flex-direction:column;gap:9px}
+.cbtn{border:none;border-radius:12px;padding:15px;font:700 15px 'Space Grotesk';color:#fff;box-shadow:var(--sh)}
+.cbtn.green{background:var(--ok)} .cbtn.amber{background:var(--warn)}
+.cbtn:disabled{background:var(--line2);color:var(--soft);box-shadow:none}
+.hint{font-size:12px;color:var(--soft);text-align:center;margin-top:10px;padding:0 6px}
+.done-banner{border-radius:12px;padding:14px;font-weight:600;font-size:14px;display:flex;gap:9px;align-items:flex-start}
+.done-banner.ok{background:var(--okT);color:var(--ok)}
+.done-banner.warn{background:var(--warnT);color:var(--warn)}
+.linkbtn{background:none;border:none;color:var(--soft);font-size:12px;text-decoration:underline;display:block;margin:12px auto 0}
+
+/* Admin */
+.admin h2{font-size:18px;margin:6px 2px 3px}
+.admin .sb{font-size:12.5px;color:var(--soft);margin:0 2px 15px}
+.acard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--sh)}
+.atop{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pill{font-size:10px;font-weight:700;letter-spacing:.05em;padding:3px 8px;border-radius:6px}
+.pill.ok{background:var(--okT);color:var(--ok)} .pill.warn{background:var(--warnT);color:var(--warn)} .pill.none{background:var(--line);color:var(--soft)}
+.stats{display:flex;gap:16px;flex-wrap:wrap;margin-top:11px}
+.stat{font-size:11.5px;color:var(--soft)}
+.stat b{display:block;font:600 16px 'Space Grotesk';color:var(--ink)}
+.flag{margin-top:10px;font-size:12.5px;font-weight:600;padding:8px 10px;border-radius:9px}
+.flag.warn{background:var(--warnT);color:var(--warn)}
+.flag.ok{background:var(--okT);color:var(--ok)}
+.flag.bad{background:var(--badT);color:var(--bad)}
+.empty{text-align:center;color:var(--soft);padding:48px 20px;font-size:14px}
+.empty b{color:var(--ink);font-family:'Space Grotesk'}
+
+/* PIN */
+.gate{position:fixed;inset:0;z-index:60;background:rgba(28,24,19,.55);display:grid;place-items:center;padding:24px}
+.gbox{background:var(--surface);border:1px solid var(--line2);border-radius:16px;padding:22px;width:100%;max-width:300px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.gbox h3{margin:0;font-size:17px}
+.gbox p{font-size:12.5px;color:var(--soft);margin:4px 0 15px}
+#pin{width:100%;font:700 20px 'Space Grotesk';text-align:center;letter-spacing:.3em;padding:12px;border:1px solid var(--line2);border-radius:11px;background:var(--paper);color:var(--ink)}
+.gerr{font-size:12px;color:var(--bad);font-weight:600;text-align:center;margin-top:8px;visibility:hidden}
+.gact{display:flex;gap:9px;margin-top:15px}
+.gact button{flex:1;border:none;border-radius:10px;padding:12px;font:700 14px 'Space Grotesk';background:var(--maiz);color:#fff}
+.gact button.g2{background:transparent;color:var(--soft);border:1px solid var(--line2)}
+
+.banner{font-size:12px;padding:9px 12px;border-radius:10px;background:var(--warnT);color:var(--warn);margin:12px 16px 0;font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div>
+      <h1>Benditarepa<span class="d">.</span> Apertura y cierre</h1>
+      <div class="hsub" id="hsub">—</div>
+    </div>
+    <button class="ghost" id="adminBtn">Admin</button>
+  </div>
+  <div class="roletabs hide" id="roleTabs"></div>
+  <div class="phasetabs hide" id="phaseTabs">
+    <button data-p="apertura" class="act">Apertura</button>
+    <button data-p="cierre">Cierre</button>
+  </div>
+</header>
+
+<div id="offline" class="banner hide">Modo local: los estados no se están compartiendo entre dispositivos.</div>
+<div id="diag" style="margin:10px 16px 0;padding:9px 12px;border-radius:10px;background:var(--line);color:var(--soft);font-size:11.5px;display:flex;justify-content:space-between;gap:10px;align-items:center">
+  <span id="diagTxt">iniciando…</span>
+  <button id="resetApp" style="border:1px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap">Reiniciar</button>
+</div>
+<div id="errbox" class="banner hide" style="background:var(--badT);color:var(--bad)"></div>
+
+<!-- CLAIM -->
+<main id="claimView">
+  <div class="sec">Acceso del punto</div>
+  <div class="card" id="pinPuntoCard">
+    <label class="fl">PIN del punto</label>
+    <input id="pinPunto" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" style="width:130px;text-align:center;font-family:'Space Grotesk'">
+    <div style="font-size:11.5px;color:var(--soft);margin-top:7px">Se pide una sola vez por dispositivo.</div>
+  </div>
+  <div class="sec">Quién eres hoy</div>
+  <div class="card">
+    <label class="fl" for="who">Tu nombre</label>
+    <input id="who" type="text" placeholder="Nombre y apellido" autocomplete="off">
+    <div style="margin-top:14px">
+      <label class="fl">Hora esperada de entrada</label>
+      <input id="expIn" type="text" value="16:00" inputmode="numeric" style="width:110px;text-align:center;font-family:'Space Grotesk'">
+    </div>
+  </div>
+  <div class="sec">Qué puesto cubres</div>
+  <div id="claimList"></div>
+  <p class="hint">Si hoy cubres dos puestos (martes a jueves con dotación reducida), marca los dos. Cada puesto se confirma por separado.</p>
+  <div style="margin-top:16px"><button class="bigbtn" id="claimGo" disabled>Entrar a mi turno</button></div>
+</main>
+
+<!-- TURNO -->
+<main id="turnView" class="hide"></main>
+
+<!-- ADMIN -->
+<main id="adminView" class="admin hide"></main>
+
+<!-- PIN -->
+<div id="gate" class="gate hide">
+  <div class="gbox">
+    <h3>Vista de administración</h3>
+    <p>Solo para quien supervisa el punto.</p>
+    <input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN">
+    <div class="gerr" id="gerr">PIN incorrecto</div>
+    <div class="gact"><button class="g2" id="gCancel">Cancelar</button><button id="gOk">Entrar</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+let taps=0;
+function diag(m){ const e=document.getElementById("diagTxt"); if(e) e.textContent=m; }
+function fatal(m){
+  const b=document.getElementById("errbox");
+  if(b){ b.textContent="Error: "+m; b.classList.remove("hide"); }
+}
+window.addEventListener("error",ev=>fatal((ev.message||"desconocido")+" · línea "+(ev.lineno||"?")));
+window.addEventListener("unhandledrejection",ev=>fatal("promesa: "+((ev.reason&&ev.reason.message)||ev.reason||"?")));
+document.addEventListener("click",()=>{ taps++; diag("app ok · toques: "+taps+" · "+(window.__dbState||"sin servidor")); },true);
+
+/* ===================== CONFIG ===================== */
+/* ====== CONFIGURA ESTO (ver README) ====== */
+const SUPABASE_URL  = window.__ENV__?.SUPABASE_URL  || "https://supabase.com/dashboard/project/unbapoxphnhvpizbjncl";
+const SUPABASE_KEY  = window.__ENV__?.SUPABASE_ANON_KEY || "sb_publishable_pzsU3YG59tYTHTGykr859w_Adv02Wti";
+const PIN_PUNTO = "1234";   // lo teclea el equipo una sola vez por dispositivo
+const ADMIN_PIN = "2468";   // vista de supervision
+/* ========================================= */
+const PUNTO = "podium";           // diseñado para varios puntos, construido para uno
+const PUNTO_NOMBRE = "Podium · Valle de Lili";
+
+const ROLES = {
+  plancha:  {nom:"Plancha",              desc:"Su estación y producción · reporta a Ensamble"},
+  ensamble: {nom:"Parrilla / Ensamble",  desc:"Su estación · comunica el estado de COCINA"},
+  servicio: {nom:"Mesero / Servicio",    desc:"Salón, clientes y servicio"},
+  caja:     {nom:"Cajero / Encargado",   desc:"Caja y pedidos · valida el punto"}
+};
+const ORDEN = ["plancha","ensamble","servicio","caja"];
+const COCINA = ["plancha","ensamble"];
+
+const LISTAS = {
+  plancha:{
+    apertura:[["Lavado de manos y uniforme",0],["Proteínas refrigeradas sacadas (PEPS)",0],
+      ["Congelados en orden de salida",0],["Arepas pre-alistadas",0],
+      ["Plancha encendida y en temperatura",1],["Estación y utensilios limpios",0]],
+    cierre:[["Gas cerrado",1],["Extractor y equipos apagados",1],["Plancha limpia",0],
+      ["Paredes y piso de la estación",0],["Faltantes y novedades reportados",0]]
+  },
+  ensamble:{
+    apertura:[["Lavado de manos y uniforme",0],["Parrilla encendida y en temperatura",1],
+      ["Salsas listas (BBQ, guacamole, Rústika, jalapeños, cebolla)",0],
+      ["Vegetales preparados (tomate, cilantro, lechuga)",0],
+      ["Mesa de ensamble organizada y toppings surtidos",0]],
+    cierre:[["Crudo y cocido separados",1],["Parrilla y mesa de ensamble limpias",0],
+      ["Toppings guardados y tapados",0],["Neveras organizadas",0],["Piso trapeado",0]]
+  },
+  servicio:{
+    apertura:[["Uniforme, presentación y lavado de manos",0],["Salón: mesas y sillas limpias",0],
+      ["Baño: insumos completos y limpieza",0],["Portarepas y empaques listos",0],
+      ["Neveras de bebidas surtidas",0]],
+    cierre:[["Salón y baño limpios",0],["Menús organizados",0],["Basuras sacadas",0],
+      ["Loza secada y organizada",0],["Daños reportados",0]]
+  },
+  caja:{
+    apertura:[["Base de caja verificada",1],["Sistema de venta operativo",0],
+      ["Medios de pago probados",0],["Plataformas de domicilios activas",0]],
+    cierre:[["Conteo y cuadre de caja",1],["Reporte de ventas enviado",1],
+      ["Diferencias reportadas",0],["Sistema y equipos apagados",1],["Candado y alarma",1]]
+  }
+};
+
+/* ===================== ESTADO ===================== */
+const LS = "br_ap_v2";
+let db = null, dbReady = false;
+let remote = {};                 // rol -> doc (fuente compartida)
+let validacion = null;
+let alertEstado = {};            // idAlerta -> {resuelta, por, at, nota}
+let cfg = {limite:"16:30"};      // hora límite de apertura
+let adminNombre = "";
+let me = {nombre:"", roles:[], expected:"16:00"};
+let activeRole = null, phase = "apertura";
+let view = "claim";
+let adminAuthed = false;
+
+const $ = id => document.getElementById(id);
+function pad(n){return String(n).padStart(2,"0")}
+function fechaId(){const d=new Date();return "d"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())}
+function fechaTxt(){const d=new Date();return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear()}
+function hhmm(ts){const d=new Date(ts);return pad(d.getHours())+":"+pad(d.getMinutes())}
+function lateMin(ts,exp){
+  const m=/^(\d{1,2}):(\d{2})$/.exec((exp||"").trim()); if(!m) return 0;
+  const d=new Date(ts), e=new Date(d.getFullYear(),d.getMonth(),d.getDate(),+m[1],+m[2],0,0);
+  const diff=Math.round((ts-e.getTime())/60000); return diff>0?diff:0;
+}
+function docPath(rol){ return "puntos/"+PUNTO+"/"+fechaId()+"/"+rol; }
+function valPath(){ return "puntos/"+PUNTO+"/"+fechaId()+"__punto/validacion"; }
+function alertPath(){ return "puntos/"+PUNTO+"/"+fechaId()+"__punto/alertas"; }
+function cfgPath(){ return "puntos/"+PUNTO+"/config__punto/general"; }
+
+function loadLocal(){ try{const r=JSON.parse(localStorage.getItem(LS));if(r&&r.fecha===fechaId())return r;}catch(e){} return null; }
+function saveLocal(){ try{localStorage.setItem(LS,JSON.stringify({fecha:fechaId(),me,activeRole}));}catch(e){} }
+
+function blank(rol){
+  return {rol, punto:PUNTO, fecha:fechaId(), persona:"", expected:"16:00",
+    llegada:null, apertura:{}, cierre:{}, estado:{apertura:"sin_reportar",cierre:"sin_reportar"},
+    detalle:{apertura:"",cierre:""}, confirmado:{apertura:null,cierre:null},
+    agotados:[], cocina:null, novedadesCaja:{diferencia:null, falla:null}};
+}
+function getRol(rol){
+  const d = remote[rol] ? remote[rol] : blank(rol);
+  if(!d.novedadesCaja) d.novedadesCaja={diferencia:null, falla:null};
+  return d;
+}
+
+/* ===================== DATOS (Supabase) ===================== */
+let sb=null;
+function fila(tipo,clave,data,fecha){
+  return {punto:PUNTO, fecha:fecha||fechaId(), tipo, clave, data, updated_at:new Date().toISOString()};
+}
+function aplicar(r){
+  if(!r) return;
+  if(r.tipo==="rol"){ if(r.data&&r.data.rol) remote[r.data.rol]=r.data; }
+  else if(r.tipo==="validacion") validacion=r.data;
+  else if(r.tipo==="alertas") alertEstado=(r.data&&r.data.estados)||{};
+  else if(r.tipo==="config"){ if(r.data&&r.data.limite) cfg.limite=r.data.limite; }
+}
+async function initDB(){
+  try{
+    if(!window.supabase || SUPABASE_URL.indexOf("PEGA_AQUI")===0) throw new Error("sin_config");
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const {data,error} = await sb.from("registros").select("*")
+      .eq("punto",PUNTO).in("fecha",[fechaId(),"config"]);
+    if(error) throw error;
+    remote={}; (data||[]).forEach(aplicar);
+    dbReady=true; syncErr=""; showErr(); rerenderSoft();
+    sb.channel("turno_"+PUNTO)
+      .on("postgres_changes",{event:"*",schema:"public",table:"registros"},payload=>{
+        const r=payload.new; if(!r||r.punto!==PUNTO) return;
+        if(r.fecha!==fechaId()&&r.fecha!=="config") return;
+        aplicar(r); rerenderSoft();
+      }).subscribe();
+  }catch(e){
+    dbReady=false;
+    $("offline").textContent = (e&&e.message==="sin_config")
+      ? "Falta configurar Supabase (ver README). Por ahora los datos quedan solo en este dispositivo."
+      : "Sin conexion con el servidor. Los datos quedan solo en este dispositivo.";
+    $("offline").classList.remove("hide");
+  }
+}
+let writing = {}, syncErr="";
+function showErr(){
+  const b=$("offline");
+  if(syncErr){ b.textContent="No se esta guardando en el servidor ("+syncErr+"). Lo que marcas queda solo en este dispositivo."; b.classList.remove("hide"); }
+  else if(dbReady) b.classList.add("hide");
+}
+async function guardar(tipo,clave,data,fecha){
+  if(!dbReady||!sb) return;
+  const {error} = await sb.from("registros").upsert(fila(tipo,clave,data,fecha),{onConflict:"punto,fecha,tipo,clave"});
+  if(error){ syncErr=error.code||"error"; } else { syncErr=""; }
+  showErr();
+}
+async function pushRol(rol,data){
+  remote[rol]=data; rerender();
+  if(writing[rol]){ writing[rol]=data; return; }
+  writing[rol]=data;
+  while(writing[rol]){ const pay=writing[rol]; await guardar("rol",rol,pay);
+    if(writing[rol]===pay) writing[rol]=null; }
+}
+async function pushVal(v){ validacion=v; rerender(); await guardar("validacion","validacion",v); }
+async function pushAlert(){ rerender(); await guardar("alertas","alertas",{estados:alertEstado}); }
+async function pushCfg(){ rerender(); await guardar("config","general",{limite:cfg.limite},"config"); }
+
+/* ===================== FOTO ===================== */
+function draw(src,w,h){
+  const max=380, k=Math.min(1,max/Math.max(w,h));
+  const c=document.createElement("canvas");
+  c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k));
+  c.getContext("2d").drawImage(src,0,0,c.width,c.height);
+  return c.toDataURL("image/jpeg",0.45);
+}
+function viaImg(file){
+  return new Promise(res=>{
+    const url=URL.createObjectURL(file); const im=new Image();
+    im.onload=()=>{ let r=null; try{ r=draw(im,im.naturalWidth,im.naturalHeight); }catch(e){}
+      URL.revokeObjectURL(url); res(r); };
+    im.onerror=()=>{ URL.revokeObjectURL(url); res(null); };
+    im.src=url;
+    setTimeout(()=>res(null),8000);
+  });
+}
+async function shrink(file){
+  if(!file) return null;
+  try{
+    if(typeof createImageBitmap==="function"){
+      const bmp=await createImageBitmap(file);
+      return draw(bmp,bmp.width,bmp.height);
+    }
+  }catch(e){}
+  return await viaImg(file);
+}
+
+/* ===================== CLAIM ===================== */
+function renderClaim(){
+  const list=$("claimList"); list.innerHTML="";
+  ORDEN.forEach(r=>{
+    const taken = remote[r] && remote[r].persona && !me.roles.includes(r);
+    const div=document.createElement("div");
+    div.className="claimrole"+(me.roles.includes(r)?" sel":"")+(taken?" taken":"");
+    div.innerHTML=`<div class="bx">${me.roles.includes(r)?"✓":""}</div>
+      <div><div class="tt">${ROLES[r].nom}</div><div class="ds">${taken?("Ya lo tomó "+remote[r].persona):ROLES[r].desc}</div></div>`;
+    div.addEventListener("click",()=>{
+      const i=me.roles.indexOf(r);
+      if(i>=0) me.roles.splice(i,1); else me.roles.push(r);
+      me.roles.sort((a,b)=>ORDEN.indexOf(a)-ORDEN.indexOf(b));
+      saveLocal(); renderClaim(); updClaimBtn();
+    });
+    list.appendChild(div);
+  });
+  updClaimBtn();
+}
+let puntoOk=false;
+try{ puntoOk = localStorage.getItem("br_punto_ok")==="1"; }catch(e){}
+function updClaimBtn(){
+  const okPin = puntoOk || ($("pinPunto") && $("pinPunto").value.trim()===PIN_PUNTO);
+  if(okPin && !puntoOk){ puntoOk=true; try{localStorage.setItem("br_punto_ok","1");}catch(e){} }
+  if(puntoOk && $("pinPuntoCard")) $("pinPuntoCard").classList.add("hide");
+  $("claimGo").disabled = !(okPin && $("who").value.trim() && me.roles.length);
+}
+document.addEventListener("input",e=>{ if(e.target&&e.target.id==="pinPunto") updClaimBtn(); });
+$("who").addEventListener("input",e=>{ me.nombre=e.target.value; saveLocal(); updClaimBtn(); });
+$("expIn").addEventListener("input",e=>{ me.expected=e.target.value.trim(); saveLocal(); });
+$("claimGo").addEventListener("click",()=>{
+  me.nombre=$("who").value.trim(); me.expected=$("expIn").value.trim()||"16:00";
+  me.roles.forEach(r=>{ const d=getRol(r); d.persona=me.nombre; d.expected=me.expected; pushRol(r,d); });
+  activeRole=me.roles[0]; view="turn"; saveLocal(); rerender();
+});
+
+/* ===================== TURNO ===================== */
+function counts(rol,ph){
+  const d=getRol(rol), t=LISTAS[rol][ph].length, done=Object.keys(d[ph]||{}).length;
+  return {done,total:t};
+}
+function toggleItem(rol,ph,i){
+  const d=getRol(rol);
+  if(d.confirmado && d.confirmado[ph]) return;
+  if(d[ph][i]) delete d[ph][i]; else d[ph][i]={at:Date.now(),foto:null};
+  pushRol(rol,d);
+}
+
+function renderTurn(){
+  const v=$("turnView"); const rol=activeRole, d=getRol(rol);
+  const items=LISTAS[rol][phase];
+  const {done,total}=counts(rol,phase);
+  const locked = !!(d.confirmado && d.confirmado[phase]);
+  let h="";
+
+  /* Llegada (solo apertura) */
+  if(phase==="apertura"){
+    h+=`<div class="sec">Mi llegada</div>`;
+    if(d.llegada){
+      const lm=d.llegada.lateMin;
+      h+=`<div class="arr done"><div class="hd">Llegada registrada <span class="tag">CONTROL HORARIO</span></div>
+        <div class="arres">
+          ${d.llegada.foto?`<img src="${d.llegada.foto}" alt="">`:""}
+          <span class="t">${hhmm(d.llegada.at)}</span>
+          <span class="badge ${lm>0?"bad":"ok"}">${lm>0?("Tarde · "+lm+" min"):"A tiempo"}</span>
+          <span class="m">Esperada ${d.llegada.expected} · registrada por ${d.persona||"—"}${d.llegada.sinFoto?" · sin foto":""}</span>
+        </div></div>`;
+    } else {
+      h+=`<div class="arr"><div class="hd">Registra tu llegada <span class="tag">CONTROL HORARIO</span></div>
+        <div class="expwrap">Hora esperada <input type="text" id="expEdit" value="${d.expected||me.expected||'16:00'}" inputmode="numeric"></div>
+        <label class="bigbtn">📸 Registrar llegada con foto<input type="file" accept="image/*" id="arrPhoto"></label>
+        <button class="linkbtn" id="arrNoPhoto">Registrar llegada sin foto</button>
+        <div style="font-size:11.5px;color:var(--soft);text-align:center;margin-top:6px">La foto es respaldo. Si la cámara falla, registra igual: la hora es lo que no se puede perder.</div></div>`;
+    }
+  }
+
+  /* Checklist propio */
+  h+=`<div class="sec">Mi estación · ${ROLES[rol].nom}</div>
+    <div class="bar ${done===total?"full":""}"><span style="width:${total?Math.round(done/total*100):0}%"></span></div>
+    <div class="meta"><span>${done} de ${total} tareas</span><span class="mono" id="spanLbl"></span></div>
+    <ul class="items" style="margin-top:12px">`;
+  items.forEach(([lb,crit],i)=>{
+    const s=d[phase][i];
+    h+=`<li class="it${crit?" crit":""}${s?" on":""}" data-i="${i}">
+      <div class="bx">${s?"✓":""}</div>
+      <div style="flex:1;min-width:0">
+        <div class="lb">${lb}${crit?'<span class="ct">CRÍTICO</span>':""}</div>
+        <div class="st">✓ ${s?hhmm(s.at):""}</div>
+        ${crit?`<div class="ph">${s&&s.foto?`<img src="${s.foto}" alt="">`:""}
+          <label class="phb ${s&&s.foto?"has":""}">${s&&s.foto?"Foto ✓":"Foto de respaldo"}
+          <input type="file" accept="image/*" data-photo="${i}"></label></div>`:""}
+      </div></li>`;
+  });
+  h+=`</ul>`;
+
+  /* Agotados — solo cocina, solo apertura */
+  if(COCINA.includes(rol) && phase==="apertura"){
+    h+=`<div class="sec">Agotados que afectan la venta</div><div class="card">
+      <div style="font-size:12.5px;color:var(--soft)">Lo que registres aquí le llega directo al Cajero. No tiene que volver a preguntar.</div>
+      <div class="chips" id="chips">${(d.agotados||[]).map((a,i)=>`<span class="chip">${a}<button data-del="${i}">×</button></span>`).join("")||'<span style="font-size:12.5px;color:var(--soft)">Sin agotados reportados.</span>'}</div>
+      <div class="addrow"><input type="text" id="agIn" placeholder="Ej: aguacate"><button id="agAdd">Agregar</button></div>
+    </div>`;
+  }
+
+  /* Novedades de caja — solo caja, solo apertura */
+  if(rol==="caja" && phase==="apertura"){
+    const nc=d.novedadesCaja||{};
+    h+=`<div class="sec">Novedades de caja</div><div class="card">
+      <div style="font-size:12.5px;color:var(--soft)">Si algo no cuadra antes de abrir, queda registrado y le llega a administración.</div>
+      ${nc.diferencia?`<div class="flag bad" style="margin-top:11px">Diferencia registrada: ${nc.diferencia.monto}${nc.diferencia.nota?(" — "+nc.diferencia.nota):""} · ${hhmm(nc.diferencia.at)}
+        <button class="linkbtn" id="delDif" style="margin:7px 0 0;text-align:left">Quitar</button></div>`
+      :`<div class="addrow"><input type="text" id="difMonto" placeholder="Diferencia en base ($)" inputmode="numeric"><button id="difAdd">Registrar</button></div>`}
+      ${nc.falla?`<div class="flag bad" style="margin-top:9px">Falla: ${nc.falla.nota} · ${hhmm(nc.falla.at)}
+        <button class="linkbtn" id="delFal" style="margin:7px 0 0;text-align:left">Quitar</button></div>`
+      :`<div class="addrow"><input type="text" id="falNota" placeholder="Falla de sistema o medio de pago"><button id="falAdd">Registrar</button></div>`}
+    </div>`;
+  }
+
+  /* Ensamble recibe Plancha */
+  if(rol==="ensamble" && phase==="apertura"){
+    h+=`<div class="sec">Estado recibido</div>`+tileHTML("plancha","apertura");
+    h+=`<div class="lock">🔒 Solo Plancha puede confirmar su estación.</div>`;
+  }
+
+  /* Caja recibe todo */
+  if(rol==="caja" && phase==="apertura"){
+    h+=`<div class="sec">Estado del punto</div>`;
+    h+=cocinaTile();
+    h+=tileHTML("servicio","apertura");
+    const ags=[].concat(...COCINA.map(r=>getRol(r).agotados||[]));
+    h+=`<div class="tile ${ags.length?"warn":"ok"}"><div class="dot"></div><div style="flex:1">
+      <div class="nm">${ags.length?"Agotados reportados":"Sin agotados"}</div>
+      <div class="mt">${ags.length?"Reportado por cocina":"Cocina no reportó agotados"}</div>
+      ${ags.length?`<div class="chips">${ags.map(a=>`<span class="chip">${a}</span>`).join("")}</div>`:""}
+    </div></div>`;
+    h+=`<div class="lock">🔒 El Cajero no marca el estado de otras áreas. Cada área responde por la suya.</div>`;
+  }
+
+  /* Confirmación */
+  h+=`<div class="confirm">`;
+  if(locked){
+    const est=d.estado[phase], c=d.confirmado[phase];
+    h+=`<div class="done-banner ${est==="listo"?"ok":"warn"}">
+      <span>${est==="listo"?"✓":"⚠"}</span>
+      <div>${est==="listo"?"Estación confirmada":"Confirmada con pendientes"} a las ${hhmm(c.at)} por ${c.por}.
+      ${d.detalle[phase]?`<br><span style="font-weight:400">${d.detalle[phase]}</span>`:""}</div></div>
+      <button class="linkbtn" id="reopen">Reabrir para corregir</button>`;
+  } else {
+    const puedeVerde = done===total && (phase==="cierre" || d.llegada);
+    if(rol==="ensamble"&&phase==="apertura"){
+      const pl=getRol("plancha");
+      const plOk = pl.estado.apertura==="listo";
+      h+=`<div class="cbtns">
+        <button class="cbtn green" id="cOk" ${puedeVerde&&plOk?"":"disabled"}>🟢 COCINA LISTA</button>
+        <button class="cbtn amber" id="cWarn">🟠 COCINA CON PENDIENTES</button></div>
+        <p class="hint">${!plOk?"Plancha todavía no confirma su estación. Puedes reportar cocina con pendientes para no frenar la apertura.":(puedeVerde?"Tu estación y Plancha están listas.":"Te faltan tareas de tu estación.")}</p>`;
+    } else if(rol==="caja"&&phase==="apertura"){
+      const est=estadoPunto();
+      h+=`<div class="cbtns">
+        <button class="cbtn green" id="cOk" ${puedeVerde&&est.todoOk?"":"disabled"}>🟢 PUNTO LISTO PARA OPERAR</button>
+        <button class="cbtn amber" id="cWarn" ${puedeVerde?"":"disabled"}>🟠 VALIDAR CON PENDIENTES</button></div>
+        <p class="hint">${!puedeVerde?"Registra tu llegada y completa tu caja para poder validar.":(est.todoOk?"Todas las áreas reportaron listo.":"Hay áreas sin reportar o con pendientes: "+est.faltan.join(", ")+". Puedes abrir igual validando con pendientes.")}</p>`;
+    } else {
+      h+=`<div class="cbtns">
+        <button class="cbtn green" id="cOk" ${puedeVerde?"":"disabled"}>🟢 ${phase==="apertura"?(rol==="plancha"?"PLANCHA LISTA":"SERVICIO LISTO"):"CIERRE COMPLETO"}</button>
+        <button class="cbtn amber" id="cWarn">🟠 ${phase==="apertura"?(rol==="plancha"?"PLANCHA CON PENDIENTES":"SERVICIO CON PENDIENTES"):"CIERRE CON PENDIENTES"}</button></div>
+        <p class="hint">${puedeVerde?"Confirma para que tu área quede reportada.":(phase==="apertura"&&!d.llegada?"Primero registra tu llegada.":"Te faltan tareas. Si no se pueden hacer, repórtalo con pendientes.")}</p>`;
+    }
+  }
+  h+=`</div>`;
+  v.innerHTML=h;
+  wireTurn(rol);
+}
+
+function estadoPunto(){
+  const faltan=[];
+  const ens=getRol("ensamble");
+  const cocinaOk = ens.cocina && ens.cocina.estado==="listo";
+  if(!ens.cocina) faltan.push("cocina sin reportar"); else if(!cocinaOk) faltan.push("cocina con pendientes");
+  const sv=getRol("servicio");
+  if(sv.estado.apertura==="sin_reportar") faltan.push("servicio sin reportar");
+  else if(sv.estado.apertura!=="listo") faltan.push("servicio con pendientes");
+  return {todoOk:faltan.length===0, faltan};
+}
+function cocinaTile(){
+  const e=getRol("ensamble"), c=e.cocina;
+  const cls = !c?"":(c.estado==="listo"?"ok":"warn");
+  return `<div class="tile ${cls}"><div class="dot"></div><div style="flex:1">
+    <div class="nm">Cocina ${!c?"— sin reportar":(c.estado==="listo"?"lista":"con pendientes")}</div>
+    <div class="mt">${c?("Comunicado por "+c.por+" a las "+hhmm(c.at)):"Ensamble aún no comunica el estado de cocina"}</div>
+    ${c&&c.detalle?`<div class="det">${c.detalle}</div>`:""}</div></div>`;
+}
+function tileHTML(rol,ph){
+  const d=getRol(rol), est=d.estado[ph], c=d.confirmado[ph];
+  const cls = est==="listo"?"ok":(est==="pendientes"?"warn":"");
+  return `<div class="tile ${cls}"><div class="dot"></div><div style="flex:1">
+    <div class="nm">${ROLES[rol].nom} ${est==="listo"?"— listo":(est==="pendientes"?"— con pendientes":"— sin reportar")}</div>
+    <div class="mt">${c?("Confirmado por "+c.por+" a las "+hhmm(c.at)):"Todavía no confirma"}</div>
+    ${d.detalle[ph]?`<div class="det">${d.detalle[ph]}</div>`:""}</div></div>`;
+}
+
+function wireTurn(rol){
+  const d=getRol(rol);
+  async function marcarLlegada(file){
+    const exp=($("expEdit")&&$("expEdit").value.trim())||d.expected||"16:00";
+    const now=Date.now();
+    let foto=null;
+    if(file){ try{ foto=await shrink(file); }catch(e){ foto=null; } }
+    const dd=getRol(rol);
+    dd.expected=exp; dd.persona=dd.persona||me.nombre;
+    dd.llegada={at:now,expected:exp,lateMin:lateMin(now,exp),foto,sinFoto:!foto};
+    pushRol(rol,dd);
+  }
+  const ap=$("arrPhoto");
+  if(ap) ap.addEventListener("change",e=>{ marcarLlegada(e.target.files[0]||null); });
+  const anp=$("arrNoPhoto");
+  if(anp) anp.addEventListener("click",()=>marcarLlegada(null));
+  const ee=$("expEdit");
+  if(ee) ee.addEventListener("input",ev=>{ const dd=getRol(rol); dd.expected=ev.target.value.trim(); remote[rol]=dd; });
+
+  $("turnView").querySelectorAll(".it").forEach(li=>{
+    const i=+li.dataset.i;
+    li.querySelector(".bx").addEventListener("click",()=>toggleItem(rol,phase,i));
+    li.querySelector(".lb").addEventListener("click",()=>toggleItem(rol,phase,i));
+    const fi=li.querySelector("input[data-photo]");
+    if(fi) fi.addEventListener("change",async e=>{
+      const f=e.target.files[0]; if(!f)return;
+      const foto=await shrink(f); const dd=getRol(rol);
+      if(dd[phase][i]){ dd[phase][i].foto=foto; pushRol(rol,dd); }
+    });
+  });
+
+  const agAdd=$("agAdd");
+  if(agAdd){
+    const add=()=>{ const v=$("agIn").value.trim(); if(!v)return;
+      const dd=getRol(rol); dd.agotados=(dd.agotados||[]).concat([v]); $("agIn").value=""; pushRol(rol,dd); };
+    agAdd.addEventListener("click",add);
+    $("agIn").addEventListener("keydown",e=>{ if(e.key==="Enter") add(); });
+    $("turnView").querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
+      const dd=getRol(rol); dd.agotados.splice(+b.dataset.del,1); pushRol(rol,dd);
+    }));
+  }
+
+  const difAdd=$("difAdd");
+  if(difAdd) difAdd.addEventListener("click",()=>{
+    const m=$("difMonto").value.trim(); if(!m) return;
+    const dd=getRol(rol); dd.novedadesCaja.diferencia={monto:m,nota:"",at:Date.now()}; pushRol(rol,dd);
+  });
+  const falAdd=$("falAdd");
+  if(falAdd) falAdd.addEventListener("click",()=>{
+    const n=$("falNota").value.trim(); if(!n) return;
+    const dd=getRol(rol); dd.novedadesCaja.falla={nota:n,at:Date.now()}; pushRol(rol,dd);
+  });
+  const dd1=$("delDif");
+  if(dd1) dd1.addEventListener("click",()=>{ const dd=getRol(rol); dd.novedadesCaja.diferencia=null; pushRol(rol,dd); });
+  const dd2=$("delFal");
+  if(dd2) dd2.addEventListener("click",()=>{ const dd=getRol(rol); dd.novedadesCaja.falla=null; pushRol(rol,dd); });
+
+  const ro=$("reopen");
+  if(ro) ro.addEventListener("click",()=>{
+    const dd=getRol(rol); dd.confirmado[phase]=null; dd.estado[phase]="sin_reportar";
+    if(rol==="ensamble"&&phase==="apertura") dd.cocina=null;
+    pushRol(rol,dd);
+  });
+
+  const ok=$("cOk"), wn=$("cWarn");
+  if(ok) ok.addEventListener("click",()=>confirmar(rol,"listo",""));
+  if(wn) wn.addEventListener("click",()=>{
+    if($("pendPanel")){ $("pendTxt").focus(); return; }
+    const p=document.createElement("div");
+    p.id="pendPanel"; p.className="card"; p.style.marginTop="12px";
+    p.innerHTML=`<label class="fl">¿Qué está pendiente? Sé específico — esto es lo que ve administración.</label>
+      <input type="text" id="pendTxt" placeholder="Ej: parrilla no enciende, técnico llega 5pm">
+      <div style="display:flex;gap:9px;margin-top:11px">
+        <button class="cbtn amber" id="pendOk" style="flex:1;padding:12px">Reportar pendiente</button>
+        <button class="linkbtn" id="pendNo" style="margin:0;align-self:center">Cancelar</button></div>`;
+    wn.parentNode.parentNode.appendChild(p);
+    $("pendTxt").focus();
+    $("pendNo").addEventListener("click",()=>p.remove());
+    const go=()=>{ const t=$("pendTxt").value.trim();
+      if(!t){ $("pendTxt").style.outline="2px solid var(--bad)"; return; }
+      confirmar(rol,"pendientes",t); };
+    $("pendOk").addEventListener("click",go);
+    $("pendTxt").addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+  });
+}
+
+function confirmar(rol,estado,detalle){
+  const d=getRol(rol);
+  d.persona=d.persona||me.nombre;
+  d.estado[phase]=estado; d.detalle[phase]=detalle;
+  d.confirmado[phase]={at:Date.now(),por:d.persona||me.nombre};
+  if(rol==="ensamble"&&phase==="apertura"){
+    d.cocina={estado,detalle,at:Date.now(),por:d.persona||me.nombre};
+  }
+  pushRol(rol,d);
+  if(rol==="caja"&&phase==="apertura"){
+    const ep=estadoPunto();
+    pushVal({estado, detalle, at:Date.now(), por:d.persona||me.nombre, faltan:ep.faltan});
+  }
+}
+
+/* ===================== MOTOR DE ALERTAS ===================== */
+/* Se derivan del estado con id estable: recalcular no duplica.
+   La resolución se guarda aparte, así una alerta conserva su historia. */
+function pasoLimite(){
+  const m=/^(\d{1,2}):(\d{2})$/.exec((cfg.limite||"16:30").trim()); if(!m) return false;
+  const n=new Date(); const lim=new Date(n.getFullYear(),n.getMonth(),n.getDate(),+m[1],+m[2],0,0);
+  return Date.now() > lim.getTime();
+}
+function computeAlertas(){
+  const A=[], f=fechaId();
+  const add=(tipo,rol,desc,sev,at)=>A.push({
+    id:f+"_"+tipo+(rol?("_"+rol):""), tipo, punto:PUNTO, rol,
+    estacion: rol?ROLES[rol].nom:"Punto",
+    persona: rol&&remote[rol]?(remote[rol].persona||"—"):"—",
+    desc, sev, at: at||Date.now(), origen: rol?("checklist "+ROLES[rol].nom):"sistema"
+  });
+
+  ORDEN.forEach(r=>{
+    const d=remote[r];
+    if(!d){ if(pasoLimite()) add("rol_sin_cubrir",r,"Nadie tomó este puesto hoy.","alta"); return; }
+    if(d.llegada && d.llegada.lateMin>0)
+      add("llegada_tarde",r,(d.persona||"—")+" llegó "+hhmm(d.llegada.at)+", "+d.llegada.lateMin+" min tarde (esperada "+d.llegada.expected+").","media",d.llegada.at);
+    if(!d.llegada && pasoLimite())
+      add("sin_llegada",r,"Sin registro de llegada pasada la hora límite.","alta");
+    if(d.estado.apertura==="pendientes" && r!=="ensamble")
+      add("area_pendientes",r,(d.detalle.apertura||"Sin detalle."),"alta",d.confirmado.apertura?d.confirmado.apertura.at:Date.now());
+    const t=Object.values(d.apertura||{}).map(x=>x.at).sort((a,b)=>a-b);
+    if(t.length>=4 && Math.round((t[t.length-1]-t[0])/60000)<=2)
+      add("marcacion_bloque",r,t.length+" tareas marcadas en menos de 2 minutos: posible llenado en bloque.","media",t[0]);
+  });
+
+  const ens=remote.ensamble;
+  if(ens && ens.cocina && ens.cocina.estado!=="listo")
+    add("cocina_pendientes","ensamble","Cocina reportada CON PENDIENTES: "+(ens.cocina.detalle||"sin detalle"),"alta",ens.cocina.at);
+
+  const cj=remote.caja;
+  if(cj && cj.novedadesCaja){
+    const df=cj.novedadesCaja.diferencia;
+    if(df) add("caja_diferencia","caja","Diferencia en base inicial: "+df.monto+(df.nota?(" — "+df.nota):""),"alta",df.at);
+    const fl=cj.novedadesCaja.falla;
+    if(fl) add("falla_sistema","caja","Falla de sistema o medio de pago: "+fl.nota,"alta",fl.at);
+  }
+
+  if(validacion){
+    if(validacion.estado!=="listo")
+      add("apertura_con_novedad",null,"Operación iniciada con novedad abierta"+(validacion.faltan&&validacion.faltan.length?(": "+validacion.faltan.join(" · ")):"")+". Validó "+validacion.por+".","alta",validacion.at);
+  } else if(pasoLimite()){
+    add("validacion_tarde",null,"Pasó la hora límite ("+cfg.limite+") y el punto no ha sido validado por el Cajero/Encargado.","alta");
+  }
+  return A.sort((a,b)=> (a.sev===b.sev? b.at-a.at : (a.sev==="alta"?-1:1)));
+}
+function resolverAlerta(id){
+  if(!adminNombre){
+    const n=prompt("¿Quién resuelve esta alerta? (tu nombre)");
+    if(!n||!n.trim()) return;
+    adminNombre=n.trim(); try{localStorage.setItem("br_admin_nom",adminNombre);}catch(e){}
+  }
+  const nota=prompt("¿Qué se hizo? (opcional)")||"";
+  alertEstado[id]={resuelta:true, por:adminNombre, at:Date.now(), nota:nota.trim()};
+  pushAlert();
+}
+function reabrirAlerta(id){ delete alertEstado[id]; pushAlert(); }
+
+/* ===================== ADMIN ===================== */
+function renderAdmin(){
+  const v=$("adminView");
+  const alertas=computeAlertas();
+  const abiertas=alertas.filter(a=>!alertEstado[a.id]);
+  const cerradas=alertas.filter(a=>alertEstado[a.id]);
+  const any=ORDEN.some(r=>remote[r]);
+
+  let h=`<h2>Supervisión del punto</h2><p class="sb">${PUNTO_NOMBRE} · ${fechaTxt()} · límite de apertura <b class="mono">${cfg.limite}</b></p>`;
+
+  /* --- Estado de apertura --- */
+  if(validacion){
+    const norm = validacion.estado==="listo";
+    h+=`<div class="acard"><div class="atop">
+      <div style="font-weight:700;font-size:15px">${norm?"APERTURA NORMAL":"APERTURA CON NOVEDAD"}</div>
+      <span class="pill ${norm?"ok":"warn"}">${norm?"VALIDADA":"CON NOVEDAD"}</span></div>
+      <div class="stat" style="margin-top:8px">Validó <b style="display:inline;font-size:13px">${validacion.por}</b> · ${fechaTxt()} ${hhmm(validacion.at)}</div>
+      ${validacion.detalle?`<div class="flag warn">${validacion.detalle}</div>`:""}
+      ${validacion.faltan&&validacion.faltan.length?`<div class="flag warn">⚠ Al validar: ${validacion.faltan.join(" · ")}</div>`:""}
+      ${validacion.snapshot?`<div class="stat" style="margin-top:9px;font-size:11.5px">Estado al validar — ${validacion.snapshot}</div>`:""}
+    </div>`;
+  } else {
+    const tarde=pasoLimite();
+    h+=`<div class="acard"><div class="flag ${tarde?"bad":"none"}" style="${tarde?"":"background:var(--line);color:var(--soft)"}">
+      ${tarde?("⚠ Pasó la hora límite ("+cfg.limite+") y el punto sigue sin validar."):"El punto todavía no ha sido validado por el Cajero/Encargado."}</div></div>`;
+  }
+
+  /* --- Bandeja de excepciones --- */
+  h+=`<div class="sec">Excepciones que requieren atención (${abiertas.length})</div>`;
+  if(!abiertas.length){
+    h+=`<div class="acard"><div class="flag ok">✓ Sin novedades. La operación va normal.</div></div>`;
+  } else {
+    abiertas.forEach(a=>{
+      h+=`<div class="acard" style="border-left:4px solid var(--${a.sev==="alta"?"bad":"warn"})">
+        <div class="atop"><div><div style="font-weight:600;font-size:14.5px">${tipoNom(a.tipo)}</div>
+        <div style="font-size:12px;color:var(--soft)">${a.estacion}${a.persona&&a.persona!=="—"?(" · "+a.persona):""} · ${hhmm(a.at)}</div></div>
+        <span class="pill ${a.sev==="alta"?"warn":"none"}">${a.sev==="alta"?"ALTA":"MEDIA"}</span></div>
+        <div style="font-size:13.5px;margin-top:9px">${a.desc}</div>
+        <button class="linkbtn" data-res="${a.id}" style="margin:11px 0 0;text-align:left">Marcar como resuelta</button></div>`;
+    });
+  }
+
+  if(cerradas.length){
+    h+=`<div class="sec">Resueltas hoy (${cerradas.length})</div>`;
+    cerradas.forEach(a=>{
+      const e=alertEstado[a.id];
+      h+=`<div class="acard" style="opacity:.75">
+        <div class="atop"><div><div style="font-weight:600;font-size:14px">${tipoNom(a.tipo)}</div>
+        <div style="font-size:12px;color:var(--soft)">${a.estacion} · ${hhmm(a.at)}</div></div>
+        <span class="pill ok">RESUELTA</span></div>
+        <div style="font-size:12.5px;margin-top:8px;color:var(--soft)">${a.desc}</div>
+        <div class="flag ok">Resuelta por ${e.por} a las ${hhmm(e.at)}${e.nota?(" — "+e.nota):""}</div>
+        <button class="linkbtn" data-reab="${a.id}" style="margin:9px 0 0;text-align:left">Reabrir</button></div>`;
+    });
+  }
+
+  /* --- Detalle por área --- */
+  h+=`<div class="sec">Detalle por área</div>`;
+  if(!any){
+    h+=`<div class="empty"><b>Sin reportes todavía.</b><br>Cuando el equipo registre llegada y confirme sus áreas, aparece aquí.</div>`;
+  } else ORDEN.forEach(r=>{
+    const d=remote[r];
+    if(!d){ h+=`<div class="acard"><div class="atop"><div style="font-weight:600">${ROLES[r].nom}</div>
+      <span class="pill none">SIN CUBRIR</span></div></div>`; return; }
+    const est=d.estado.apertura;
+    const total=LISTAS[r].apertura.length, done=Object.keys(d.apertura||{}).length;
+    h+=`<div class="acard">
+      <div class="atop"><div><div style="font-weight:600;font-size:15px">${ROLES[r].nom}</div>
+      <div style="font-size:12.5px;color:var(--soft)">${d.persona||"— sin nombre —"}</div></div>
+      <span class="pill ${est==="listo"?"ok":(est==="pendientes"?"warn":"none")}">${est==="listo"?"LISTO":(est==="pendientes"?"PENDIENTES":"SIN REPORTAR")}</span></div>
+      <div class="stats">
+        <div class="stat">Cumplido<b>${total?Math.round(done/total*100):0}%</b></div>
+        <div class="stat">Llegada<b>${d.llegada?hhmm(d.llegada.at):"—"}</b></div>
+        <div class="stat">Confirmó<b>${d.confirmado.apertura?hhmm(d.confirmado.apertura.at):"—"}</b></div>
+      </div>
+      ${d.detalle.apertura?`<div class="flag warn">Pendiente: ${d.detalle.apertura}</div>`:""}
+      ${(d.agotados||[]).length?`<div class="flag bad">Agotados: ${d.agotados.join(", ")}</div>`:""}
+    </div>`;
+  });
+
+  /* --- Config --- */
+  h+=`<div class="sec">Configuración</div><div class="acard">
+    <label class="fl">Hora límite de apertura</label>
+    <input type="text" id="limIn" value="${cfg.limite}" inputmode="numeric" style="width:110px;text-align:center;font-family:'Space Grotesk'">
+    <div style="font-size:11.5px;color:var(--soft);margin-top:7px">Pasada esta hora sin validación del punto, se genera alerta.</div>
+  </div>
+  <p class="hint" style="margin-top:16px">Las alertas se calculan cuando alguien abre esta vista. Todavía no se envían a ningún lado.</p>`;
+
+  v.innerHTML=h;
+  v.querySelectorAll("[data-res]").forEach(b=>b.addEventListener("click",()=>resolverAlerta(b.dataset.res)));
+  v.querySelectorAll("[data-reab]").forEach(b=>b.addEventListener("click",()=>reabrirAlerta(b.dataset.reab)));
+  const li=$("limIn");
+  if(li) li.addEventListener("change",e=>{ cfg.limite=e.target.value.trim()||"16:30"; pushCfg(); });
+}
+
+function tipoNom(t){
+  return ({
+    llegada_tarde:"Llegada tarde",
+    sin_llegada:"Sin registro de llegada",
+    rol_sin_cubrir:"Puesto sin cubrir",
+    area_pendientes:"Área con pendientes",
+    cocina_pendientes:"Cocina con pendientes",
+    caja_diferencia:"Diferencia en base de caja",
+    falla_sistema:"Falla de sistema o pagos",
+    apertura_con_novedad:"Apertura con novedad abierta",
+    validacion_tarde:"Punto sin validar",
+    marcacion_bloque:"Marcación en bloque"
+  })[t]||t;
+}
+
+/* ===================== RENDER / NAV ===================== */
+function escribiendo(){
+  const a=document.activeElement;
+  return !!(a && a.tagName==="INPUT" && a.type==="text");
+}
+/* Acción del usuario: se pinta SIEMPRE, sin excusas. */
+function rerender(){ pendienteRender=false; pinta(); }
+/* Actualización que llega de otro dispositivo: espera si estoy escribiendo,
+   para no destruirme el campo a media palabra. */
+function rerenderSoft(){
+  if(escribiendo()){ pendienteRender=true; return; }
+  rerender();
+}
+let pendienteRender=false;
+document.addEventListener("focusout",()=>{ setTimeout(()=>{ if(pendienteRender&&!escribiendo()) rerender(); },80); });
+function pinta(){ try{ pintaReal(); }catch(e){ fatal("al dibujar: "+e.message); } }
+function pintaReal(){
+  $("hsub").textContent = PUNTO_NOMBRE+" · "+fechaTxt();
+  $("claimView").classList.toggle("hide", view!=="claim");
+  $("turnView").classList.toggle("hide", view!=="turn");
+  $("adminView").classList.toggle("hide", view!=="admin");
+  $("roleTabs").classList.toggle("hide", view!=="turn"||me.roles.length<2);
+  $("phaseTabs").classList.toggle("hide", view!=="turn");
+  $("adminBtn").classList.toggle("on", view==="admin");
+  $("adminBtn").textContent = view==="admin"?"← Turno":"Admin";
+  if(view==="claim") renderClaim();
+  if(view==="turn"){ renderRoleTabs(); renderTurn(); }
+  if(view==="admin") renderAdmin();
+}
+function renderRoleTabs(){
+  const t=$("roleTabs"); if(me.roles.length<2){t.innerHTML="";return;}
+  t.innerHTML=me.roles.map(r=>`<button data-r="${r}" class="${r===activeRole?"act":""}">${ROLES[r].nom}</button>`).join("");
+  t.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{activeRole=b.dataset.r;saveLocal();rerender();}));
+}
+$("phaseTabs").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+  $("phaseTabs").querySelectorAll("button").forEach(x=>x.classList.remove("act"));
+  b.classList.add("act"); phase=b.dataset.p; rerender();
+}));
+$("adminBtn").addEventListener("click",()=>{
+  if(view==="admin"){ view = me.roles.length?"turn":"claim"; rerender(); window.scrollTo(0,0); return; }
+  if(!adminAuthed){ $("gate").classList.remove("hide"); $("pin").value=""; $("gerr").style.visibility="hidden"; setTimeout(()=>$("pin").focus(),60); return; }
+  view="admin"; rerender(); window.scrollTo(0,0);
+});
+function tryPin(){
+  if($("pin").value.trim()===ADMIN_PIN){ adminAuthed=true; $("gate").classList.add("hide"); view="admin"; rerender(); window.scrollTo(0,0); }
+  else { $("gerr").style.visibility="visible"; $("pin").value=""; $("pin").focus(); }
+}
+$("gOk").addEventListener("click",tryPin);
+$("gCancel").addEventListener("click",()=>$("gate").classList.add("hide"));
+$("pin").addEventListener("keydown",e=>{if(e.key==="Enter")tryPin()});
+
+/* ===================== BOOT ===================== */
+document.getElementById("resetApp").addEventListener("click",()=>{
+  try{ localStorage.removeItem(LS); localStorage.removeItem("br_admin_nom"); }catch(e){}
+  location.reload();
+});
+(function boot(){
+  const l=loadLocal();
+  if(l){ me=l.me||me; activeRole=l.activeRole||(me.roles[0]||null);
+    if(me.roles.length) view="turn";
+    $("who").value=me.nombre||""; $("expIn").value=me.expected||"16:00"; }
+  rerender();
+  initDB();
+})();
+</script>
+</body>
+</html>
