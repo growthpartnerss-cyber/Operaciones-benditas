@@ -220,10 +220,6 @@ ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   <div class="card">
     <label class="fl" for="who">Tu nombre</label>
     <input id="who" type="text" placeholder="Nombre y apellido" autocomplete="off">
-    <div style="margin-top:14px">
-      <label class="fl">Hora esperada de entrada</label>
-      <input id="expIn" type="text" value="16:00" inputmode="numeric" style="width:110px;text-align:center;font-family:'Space Grotesk'">
-    </div>
   </div>
   <div class="sec">Qué puesto cubres</div>
   <div id="claimList"></div>
@@ -316,9 +312,9 @@ let db = null, dbReady = false;
 let remote = {};                 // rol -> doc (fuente compartida)
 let validacion = null;
 let alertEstado = {};            // idAlerta -> {resuelta, por, at, nota}
-let cfg = {limite:"16:30"};      // hora límite de apertura
+let cfg = {limite:"17:00", entrada:"16:30"};  // limite de validacion + hora de entrada
 let adminNombre = "";
-let me = {nombre:"", roles:[], expected:"16:00"};
+let me = {nombre:"", roles:[], expected:"16:30"};
 let activeRole = null, phase = "apertura";
 let view = "claim";
 let adminAuthed = false;
@@ -342,7 +338,7 @@ function loadLocal(){ try{const r=JSON.parse(localStorage.getItem(LS));if(r&&r.f
 function saveLocal(){ try{localStorage.setItem(LS,JSON.stringify({fecha:fechaId(),me,activeRole}));}catch(e){} }
 
 function blank(rol){
-  return {rol, punto:PUNTO, fecha:fechaId(), persona:"", expected:"16:00",
+  return {rol, punto:PUNTO, fecha:fechaId(), persona:"", expected:"16:30",
     llegada:null, apertura:{}, cierre:{}, estado:{apertura:"sin_reportar",cierre:"sin_reportar"},
     detalle:{apertura:"",cierre:""}, confirmado:{apertura:null,cierre:null},
     agotados:[], cocina:null, novedadesCaja:{diferencia:null, falla:null}};
@@ -363,7 +359,7 @@ function aplicar(r){
   if(r.tipo==="rol"){ if(r.data&&r.data.rol) remote[r.data.rol]=r.data; }
   else if(r.tipo==="validacion") validacion=r.data;
   else if(r.tipo==="alertas") alertEstado=(r.data&&r.data.estados)||{};
-  else if(r.tipo==="config"){ if(r.data&&r.data.limite) cfg.limite=r.data.limite; }
+  else if(r.tipo==="config"){ if(r.data&&r.data.limite) cfg.limite=r.data.limite; if(r.data&&r.data.entrada) cfg.entrada=r.data.entrada; }
 }
 async function initDB(){
   try{
@@ -373,7 +369,7 @@ async function initDB(){
       .eq("punto",PUNTO).in("fecha",[fechaId(),"config"]);
     if(error) throw error;
     remote={}; (data||[]).forEach(aplicar);
-    dbReady=true; syncErr=""; showErr(); rerenderSoft();
+    dbReady=true; syncErr=""; window.__dbState="conectado"; diag("app ok · conectado al servidor"); showErr(); rerenderSoft();
     sb.channel("turno_"+PUNTO)
       .on("postgres_changes",{event:"*",schema:"public",table:"registros"},payload=>{
         const r=payload.new; if(!r||r.punto!==PUNTO) return;
@@ -382,6 +378,8 @@ async function initDB(){
       }).subscribe();
   }catch(e){
     dbReady=false;
+    window.__dbState="sin servidor ("+((e&&(e.code||e.message))||"error")+")";
+    diag("app ok · "+window.__dbState);
     $("offline").textContent = (e&&e.message==="sin_config")
       ? "Falta configurar Supabase (ver README). Por ahora los datos quedan solo en este dispositivo."
       : "Sin conexion con el servidor. Los datos quedan solo en este dispositivo.";
@@ -409,7 +407,7 @@ async function pushRol(rol,data){
 }
 async function pushVal(v){ validacion=v; rerender(); await guardar("validacion","validacion",v); }
 async function pushAlert(){ rerender(); await guardar("alertas","alertas",{estados:alertEstado}); }
-async function pushCfg(){ rerender(); await guardar("config","general",{limite:cfg.limite},"config"); }
+async function pushCfg(){ rerender(); await guardar("config","general",{limite:cfg.limite,entrada:cfg.entrada},"config"); }
 
 /* ===================== FOTO ===================== */
 function draw(src,w,h){
@@ -469,9 +467,9 @@ function updClaimBtn(){
 }
 document.addEventListener("input",e=>{ if(e.target&&e.target.id==="pinPunto") updClaimBtn(); });
 $("who").addEventListener("input",e=>{ me.nombre=e.target.value; saveLocal(); updClaimBtn(); });
-$("expIn").addEventListener("input",e=>{ me.expected=e.target.value.trim(); saveLocal(); });
+
 $("claimGo").addEventListener("click",()=>{
-  me.nombre=$("who").value.trim(); me.expected=$("expIn").value.trim()||"16:00";
+  me.nombre=$("who").value.trim(); me.expected=cfg.entrada;
   me.roles.forEach(r=>{ const d=getRol(r); d.persona=me.nombre; d.expected=me.expected; pushRol(r,d); });
   activeRole=me.roles[0]; view="turn"; saveLocal(); rerender();
 });
@@ -509,7 +507,7 @@ function renderTurn(){
         </div></div>`;
     } else {
       h+=`<div class="arr"><div class="hd">Registra tu llegada <span class="tag">CONTROL HORARIO</span></div>
-        <div class="expwrap">Hora esperada <input type="text" id="expEdit" value="${d.expected||me.expected||'16:00'}" inputmode="numeric"></div>
+        <div class="expwrap">Hora de entrada: <b class="mono" style="font-size:15px;color:var(--ink)">${cfg.entrada}</b> <span style="font-size:11px">· la fija administración</span></div>
         <label class="bigbtn">📸 Registrar llegada con foto<input type="file" accept="image/*" id="arrPhoto"></label>
         <button class="linkbtn" id="arrNoPhoto">Registrar llegada sin foto</button>
         <div style="font-size:11.5px;color:var(--soft);text-align:center;margin-top:6px">La foto es respaldo. Si la cámara falla, registra igual: la hora es lo que no se puede perder.</div></div>`;
@@ -644,7 +642,7 @@ function tileHTML(rol,ph){
 function wireTurn(rol){
   const d=getRol(rol);
   async function marcarLlegada(file){
-    const exp=($("expEdit")&&$("expEdit").value.trim())||d.expected||"16:00";
+    const exp=cfg.entrada;
     const now=Date.now();
     let foto=null;
     if(file){ try{ foto=await shrink(file); }catch(e){ foto=null; } }
@@ -657,8 +655,7 @@ function wireTurn(rol){
   if(ap) ap.addEventListener("change",e=>{ marcarLlegada(e.target.files[0]||null); });
   const anp=$("arrNoPhoto");
   if(anp) anp.addEventListener("click",()=>marcarLlegada(null));
-  const ee=$("expEdit");
-  if(ee) ee.addEventListener("input",ev=>{ const dd=getRol(rol); dd.expected=ev.target.value.trim(); remote[rol]=dd; });
+
 
   $("turnView").querySelectorAll(".it").forEach(li=>{
     const i=+li.dataset.i;
@@ -813,7 +810,7 @@ function renderAdmin(){
   const cerradas=alertas.filter(a=>alertEstado[a.id]);
   const any=ORDEN.some(r=>remote[r]);
 
-  let h=`<h2>Supervisión del punto</h2><p class="sb">${PUNTO_NOMBRE} · ${fechaTxt()} · límite de apertura <b class="mono">${cfg.limite}</b></p>`;
+  let h=`<h2>Supervisión del punto</h2><p class="sb">${PUNTO_NOMBRE} · ${fechaTxt()} · entrada <b class="mono">${cfg.entrada}</b> · límite <b class="mono">${cfg.limite}</b></p>`;
 
   /* --- Estado de apertura --- */
   if(validacion){
@@ -887,6 +884,9 @@ function renderAdmin(){
 
   /* --- Config --- */
   h+=`<div class="sec">Configuración</div><div class="acard">
+    <label class="fl">Hora de entrada del personal</label>
+    <input type="text" id="entIn" value="${cfg.entrada}" inputmode="numeric" style="width:110px;text-align:center;font-family:'Space Grotesk'">
+    <div style="font-size:11.5px;color:var(--soft);margin:7px 0 16px">Contra esta hora se calcula A TIEMPO / TARDE. Solo se cambia aquí.</div>
     <label class="fl">Hora límite de apertura</label>
     <input type="text" id="limIn" value="${cfg.limite}" inputmode="numeric" style="width:110px;text-align:center;font-family:'Space Grotesk'">
     <div style="font-size:11.5px;color:var(--soft);margin-top:7px">Pasada esta hora sin validación del punto, se genera alerta.</div>
@@ -897,7 +897,9 @@ function renderAdmin(){
   v.querySelectorAll("[data-res]").forEach(b=>b.addEventListener("click",()=>resolverAlerta(b.dataset.res)));
   v.querySelectorAll("[data-reab]").forEach(b=>b.addEventListener("click",()=>reabrirAlerta(b.dataset.reab)));
   const li=$("limIn");
-  if(li) li.addEventListener("change",e=>{ cfg.limite=e.target.value.trim()||"16:30"; pushCfg(); });
+  if(li) li.addEventListener("change",e=>{ cfg.limite=e.target.value.trim()||"17:00"; pushCfg(); });
+  const en=$("entIn");
+  if(en) en.addEventListener("change",e=>{ cfg.entrada=e.target.value.trim()||"16:30"; pushCfg(); });
 }
 
 function tipoNom(t){
@@ -975,10 +977,11 @@ document.getElementById("resetApp").addEventListener("click",()=>{
   const l=loadLocal();
   if(l){ me=l.me||me; activeRole=l.activeRole||(me.roles[0]||null);
     if(me.roles.length) view="turn";
-    $("who").value=me.nombre||""; $("expIn").value=me.expected||"16:00"; }
+    $("who").value=me.nombre||"";  }
   rerender();
   initDB();
 })();
 </script>
 </body>
 </html>
+
