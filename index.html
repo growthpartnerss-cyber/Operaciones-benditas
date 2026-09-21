@@ -78,6 +78,9 @@ input:focus,select:focus{outline:2px solid var(--maiz);outline-offset:1px}
 .claimrole .tt{font-weight:600;font-size:14.5px}
 .claimrole .ds{font-size:11.5px;color:var(--soft)}
 .claimrole.taken{opacity:.55}
+.claimbar{position:sticky;bottom:0;margin:16px -16px 0;padding:12px 16px 14px;background:var(--paper);border-top:1px solid var(--line)}
+.claimmsg{font-size:12.5px;font-weight:600;text-align:center;margin-bottom:8px;min-height:17px;color:var(--bad)}
+.claimmsg.ok{color:var(--ok)}
 
 /* Llegada */
 .arr{border:1px solid var(--line2);border-radius:var(--r);padding:14px;background:var(--surface);box-shadow:var(--sh)}
@@ -210,7 +213,7 @@ ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 
 <!-- CLAIM -->
 <main id="claimView">
-  <div class="sec">Acceso del punto</div>
+  <div class="sec" id="secAcceso">Acceso del punto</div>
   <div class="card" id="pinPuntoCard">
     <label class="fl">PIN del punto</label>
     <input id="pinPunto" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" style="width:130px;text-align:center;font-family:'Space Grotesk'">
@@ -224,7 +227,10 @@ ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
   <div class="sec">Qué puesto cubres</div>
   <div id="claimList"></div>
   <p class="hint">Si hoy cubres dos puestos (martes a jueves con dotación reducida), marca los dos. Cada puesto se confirma por separado.</p>
-  <div style="margin-top:16px"><button class="bigbtn" id="claimGo" disabled>Entrar a mi turno</button></div>
+  <div class="claimbar">
+    <div class="claimmsg" id="claimMsg"></div>
+    <button class="bigbtn" id="claimGo" disabled>Entrar a mi turno</button>
+  </div>
 </main>
 
 <!-- TURNO -->
@@ -462,8 +468,14 @@ try{ puntoOk = localStorage.getItem("br_punto_ok")==="1"; }catch(e){}
 function updClaimBtn(){
   const okPin = puntoOk || ($("pinPunto") && $("pinPunto").value.trim()===PIN_PUNTO);
   if(okPin && !puntoOk){ puntoOk=true; try{localStorage.setItem("br_punto_ok","1");}catch(e){} }
-  if(puntoOk && $("pinPuntoCard")) $("pinPuntoCard").classList.add("hide");
-  $("claimGo").disabled = !(okPin && $("who").value.trim() && me.roles.length);
+  if(puntoOk){ if($("pinPuntoCard")) $("pinPuntoCard").classList.add("hide"); if($("secAcceso")) $("secAcceso").classList.add("hide"); }
+  var falta = !okPin ? (($("pinPunto")&&$("pinPunto").value.trim().length) ? "PIN incorrecto" : "Escribe el PIN del punto")
+            : !$("who").value.trim() ? "Falta tu nombre"
+            : !me.roles.length      ? "Marca el puesto que cubres hoy"
+            : "";
+  var msg = $("claimMsg");
+  if(msg){ msg.textContent = falta || "Listo, puedes entrar"; msg.classList.toggle("ok", !falta); }
+  $("claimGo").disabled = !!falta;
 }
 document.addEventListener("input",e=>{ if(e.target&&e.target.id==="pinPunto") updClaimBtn(); });
 $("who").addEventListener("input",e=>{ me.nombre=e.target.value; saveLocal(); updClaimBtn(); });
