@@ -173,10 +173,58 @@ ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .empty{text-align:center;color:var(--soft);padding:48px 20px;font-size:14px}
 .empty b{color:var(--ink);font-family:'Space Grotesk'}
 
+/* Admin · supervisión por excepción (mobile-first) */
+.adminwide{max-width:1100px}
+.adsub{display:flex;gap:6px;margin:2px 0 16px;background:var(--line);padding:4px;border-radius:12px}
+.adsub button{flex:1;border:none;background:transparent;color:var(--soft);font-weight:600;font-size:13.5px;padding:9px 2px;border-radius:9px}
+.adsub button.act{background:var(--surface);color:var(--ink);box-shadow:var(--sh)}
+
+/* Veredicto: la primera cosa que se ve. Responde "normal o atención". */
+.verdict{border-radius:16px;padding:18px;margin-bottom:18px;border:1px solid;display:flex;gap:16px;align-items:center}
+/* El color del veredicto lo cargan el fondo y el borde. El texto va en --ink:
+   sobre el ambar claro el texto ambar da 2.6:1 y no se lee de un vistazo. */
+.verdict .vn{font:700 40px 'Space Grotesk';line-height:1;flex:none;min-width:52px;text-align:center;color:var(--ink)}
+.verdict .vt{font:700 19px 'Space Grotesk';line-height:1.2;color:var(--ink)}
+.verdict .vs{font-size:12.5px;margin-top:5px;line-height:1.4;color:var(--soft)}
+.verdict.ok{background:var(--okT);border-color:var(--ok);color:var(--ok)}
+.verdict.warn{background:var(--warnT);border-color:var(--warn);color:var(--warn)}
+.verdict.bad{background:var(--badT);border-color:var(--bad);color:var(--bad)}
+.verdict.none{background:var(--surface);border-color:var(--line2);color:var(--soft)}
+
+/* Fila desplegable: titular a la vista, detalle bajo demanda. */
+.row{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;overflow:hidden}
+.row>.rh{display:flex;align-items:center;gap:11px;padding:13px 14px;width:100%;background:none;border:none;text-align:left;color:var(--ink)}
+.row>.rh .dot{width:11px;height:11px;border-radius:50%;flex:none;background:var(--line2)}
+.row.sev-alta>.rh .dot{background:var(--bad)}
+.row.sev-media>.rh .dot{background:var(--warn)}
+.row.st-ok>.rh .dot{background:var(--ok)}
+.row.st-warn>.rh .dot{background:var(--warn)}
+.row .rt{flex:1;min-width:0}
+.row .rt .t{display:block;font-weight:600;font-size:15px;line-height:1.3}
+.row .rt .m{display:block;font-size:12px;color:var(--soft);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .chev{flex:none;color:var(--soft);font-size:11px;transition:transform .18s}
+.row.open .chev{transform:rotate(90deg)}
+.row .rb{display:none;padding:0 14px 14px;border-top:1px solid var(--line)}
+.row.open .rb{display:block}
+.row.open>.rh{padding-bottom:12px}
+.row.done{opacity:.72}
+.resbtn{border:1px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:10px;padding:11px 14px;font:600 13.5px 'Inter',sans-serif;margin-top:13px;width:100%}
+.mini{display:flex;gap:16px;flex-wrap:wrap;padding-top:12px}
+.mini div{font-size:11.5px;color:var(--soft)}
+.mini b{display:block;font:600 15px 'Space Grotesk';color:var(--ink)}
+.rtxt{padding-top:12px;font-size:13.5px;line-height:1.5}
+
+@media (min-width:900px){
+  .adcols{display:grid;grid-template-columns:1.3fr 1fr;gap:26px;align-items:start}
+  .adcols>div>.sec:first-child{margin-top:0}
+  .verdict{padding:22px 24px}
+  .verdict .vn{font-size:52px;min-width:66px}
+}
+
 /* PIN */
 .gate{position:fixed;inset:0;z-index:60;background:rgba(28,24,19,.55);display:grid;place-items:center;padding:24px}
 .gbox{background:var(--surface);border:1px solid var(--line2);border-radius:16px;padding:22px;width:100%;max-width:300px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
-.gbox h3{margin:0;font-size:17px}
+.gbox h2{margin:0;font-size:17px}
 .gbox p{font-size:12.5px;color:var(--soft);margin:4px 0 15px}
 #pin{width:100%;font:700 20px 'Space Grotesk';text-align:center;letter-spacing:.3em;padding:12px;border:1px solid var(--line2);border-radius:11px;background:var(--paper);color:var(--ink)}
 .gerr{font-size:12px;color:var(--bad);font-weight:600;text-align:center;margin-top:8px;visibility:hidden}
@@ -242,7 +290,7 @@ ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 <!-- PIN -->
 <div id="gate" class="gate hide">
   <div class="gbox">
-    <h3>Vista de administración</h3>
+    <h2>Vista de administración</h2>
     <p>Solo para quien supervisa el punto.</p>
     <input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN">
     <div class="gerr" id="gerr">PIN incorrecto</div>
@@ -815,102 +863,168 @@ function resolverAlerta(id){
 function reabrirAlerta(id){ delete alertEstado[id]; pushAlert(); }
 
 /* ===================== ADMIN ===================== */
+/* Estado de la vista: qué está desplegado y en qué pestaña.
+   Vive fuera del render para que una actualización de otro dispositivo
+   no le cierre en la cara lo que el admin acaba de abrir. */
+let adminTab = "sup";
+const adminOpen = new Set();
+
+/* Una sola respuesta a "el punto opera normal o requiere atención". */
+function veredicto(abiertas){
+  const altas = abiertas.filter(a=>a.sev==="alta").length;
+  const medias = abiertas.length-altas;
+  if(altas)           return {k:"bad",  t:"REQUIERE ATENCIÓN", s:altas+(altas===1?" grave":" graves")+(medias?(" y "+medias+(medias===1?" media":" medias")):"")+" sin resolver."};
+  if(abiertas.length) return {k:"warn", t:"CON NOVEDADES",     s:"Nada grave, pero hay cosas por revisar."};
+  if(validacion)      return {k:"ok",   t:"OPERANDO NORMAL",   s:"Punto validado por "+validacion.por+" a las "+hhmm(validacion.at)+"."};
+  if(pasoLimite())    return {k:"bad",  t:"SIN VALIDAR",       s:"Pasó la hora límite ("+cfg.limite+") y nadie validó el punto."};
+  return {k:"none", t:"EN APERTURA", s:"El punto todavía no ha sido validado por el Cajero/Encargado."};
+}
+
+/* Titular visible, cuerpo bajo demanda. El id manda el estado abierto/cerrado. */
+function adRow(id, cls, titulo, meta, cuerpo){
+  const op = adminOpen.has(id);
+  return `<div class="row ${cls}${op?" open":""}">
+    <button class="rh" data-tog="${id}">
+      <span class="dot"></span>
+      <span class="rt"><span class="t">${titulo}</span>${meta?`<span class="m">${meta}</span>`:""}</span>
+      <span class="chev">&#9654;</span>
+    </button>
+    <div class="rb">${cuerpo}</div>
+  </div>`;
+}
+
+function adminAjustes(){
+  return `<div class="acard">
+    <label class="fl">Hora de entrada del personal</label>
+    <input type="text" id="entIn" value="${cfg.entrada}" inputmode="numeric" style="width:120px;text-align:center;font-family:'Space Grotesk'">
+    <div style="font-size:11.5px;color:var(--soft);margin:7px 0 18px">Contra esta hora se calcula A TIEMPO / TARDE. Solo se cambia aquí.</div>
+    <label class="fl">Hora límite de apertura</label>
+    <input type="text" id="limIn" value="${cfg.limite}" inputmode="numeric" style="width:120px;text-align:center;font-family:'Space Grotesk'">
+    <div style="font-size:11.5px;color:var(--soft);margin-top:7px">Pasada esta hora sin validación del punto, se genera alerta.</div>
+  </div>
+  <div class="acard">
+    <div style="font-weight:600;font-size:14px">PIN del punto y PIN de administración</div>
+    <div style="font-size:12.5px;color:var(--soft);line-height:1.5;margin-top:5px">Hoy están fijos en el código. Cambiarlos necesita subir una versión nueva de la app.</div>
+  </div>
+  <p class="hint" style="margin-top:16px">Las alertas se calculan cuando alguien abre esta vista. Todavía no se envían a ningún lado.</p>`;
+}
+
 function renderAdmin(){
   const v=$("adminView");
   const alertas=computeAlertas();
   const abiertas=alertas.filter(a=>!alertEstado[a.id]);
   const cerradas=alertas.filter(a=>alertEstado[a.id]);
-  const any=ORDEN.some(r=>remote[r]);
 
-  let h=`<h2>Supervisión del punto</h2><p class="sb">${PUNTO_NOMBRE} · ${fechaTxt()} · entrada <b class="mono">${cfg.entrada}</b> · límite <b class="mono">${cfg.limite}</b></p>`;
+  let h=`<h2>Supervisión del punto</h2>
+  <p class="sb">${PUNTO_NOMBRE} &middot; ${fechaTxt()}</p>
+  <div class="adsub">
+    <button data-tab="sup" class="${adminTab==="sup"?"act":""}">Supervisión${abiertas.length?" ("+abiertas.length+")":""}</button>
+    <button data-tab="cfg" class="${adminTab==="cfg"?"act":""}">Ajustes</button>
+  </div>`;
 
-  /* --- Estado de apertura --- */
-  if(validacion){
-    const norm = validacion.estado==="listo";
-    h+=`<div class="acard"><div class="atop">
-      <div style="font-weight:700;font-size:15px">${norm?"APERTURA NORMAL":"APERTURA CON NOVEDAD"}</div>
-      <span class="pill ${norm?"ok":"warn"}">${norm?"VALIDADA":"CON NOVEDAD"}</span></div>
-      <div class="stat" style="margin-top:8px">Validó <b style="display:inline;font-size:13px">${validacion.por}</b> · ${fechaTxt()} ${hhmm(validacion.at)}</div>
-      ${validacion.detalle?`<div class="flag warn">${validacion.detalle}</div>`:""}
-      ${validacion.faltan&&validacion.faltan.length?`<div class="flag warn">⚠ Al validar: ${validacion.faltan.join(" · ")}</div>`:""}
-      ${validacion.snapshot?`<div class="stat" style="margin-top:9px;font-size:11.5px">Estado al validar — ${validacion.snapshot}</div>`:""}
-    </div>`;
-  } else {
-    const tarde=pasoLimite();
-    h+=`<div class="acard"><div class="flag ${tarde?"bad":"none"}" style="${tarde?"":"background:var(--line);color:var(--soft)"}">
-      ${tarde?("⚠ Pasó la hora límite ("+cfg.limite+") y el punto sigue sin validar."):"El punto todavía no ha sido validado por el Cajero/Encargado."}</div></div>`;
+  if(adminTab==="cfg"){
+    h+=adminAjustes();
+    v.innerHTML=h; wireAdmin(v); return;
   }
 
-  /* --- Bandeja de excepciones --- */
-  h+=`<div class="sec">Excepciones que requieren atención (${abiertas.length})</div>`;
+  /* 1. Estado general del punto */
+  const vd=veredicto(abiertas);
+  h+=`<div class="verdict ${vd.k}">
+    <div class="vn">${abiertas.length}</div>
+    <div><div class="vt">${vd.t}</div><div class="vs">${vd.s}</div></div>
+  </div>`;
+
+  h+=`<div class="adcols"><div>`;
+
+  /* 2. Alertas pendientes, lo grave arriba */
+  h+=`<div class="sec">Requieren atención (${abiertas.length})</div>`;
   if(!abiertas.length){
-    h+=`<div class="acard"><div class="flag ok">✓ Sin novedades. La operación va normal.</div></div>`;
-  } else {
-    abiertas.forEach(a=>{
-      h+=`<div class="acard" style="border-left:4px solid var(--${a.sev==="alta"?"bad":"warn"})">
-        <div class="atop"><div><div style="font-weight:600;font-size:14.5px">${tipoNom(a.tipo)}</div>
-        <div style="font-size:12px;color:var(--soft)">${a.estacion}${a.persona&&a.persona!=="—"?(" · "+a.persona):""} · ${hhmm(a.at)}</div></div>
-        <span class="pill ${a.sev==="alta"?"warn":"none"}">${a.sev==="alta"?"ALTA":"MEDIA"}</span></div>
-        <div style="font-size:13.5px;margin-top:9px">${a.desc}</div>
-        <button class="linkbtn" data-res="${a.id}" style="margin:11px 0 0;text-align:left">Marcar como resuelta</button></div>`;
-    });
-  }
-
-  if(cerradas.length){
-    h+=`<div class="sec">Resueltas hoy (${cerradas.length})</div>`;
-    cerradas.forEach(a=>{
-      const e=alertEstado[a.id];
-      h+=`<div class="acard" style="opacity:.75">
-        <div class="atop"><div><div style="font-weight:600;font-size:14px">${tipoNom(a.tipo)}</div>
-        <div style="font-size:12px;color:var(--soft)">${a.estacion} · ${hhmm(a.at)}</div></div>
-        <span class="pill ok">RESUELTA</span></div>
-        <div style="font-size:12.5px;margin-top:8px;color:var(--soft)">${a.desc}</div>
-        <div class="flag ok">Resuelta por ${e.por} a las ${hhmm(e.at)}${e.nota?(" — "+e.nota):""}</div>
-        <button class="linkbtn" data-reab="${a.id}" style="margin:9px 0 0;text-align:left">Reabrir</button></div>`;
-    });
-  }
-
-  /* --- Detalle por área --- */
-  h+=`<div class="sec">Detalle por área</div>`;
-  if(!any){
-    h+=`<div class="empty"><b>Sin reportes todavía.</b><br>Cuando el equipo registre llegada y confirme sus áreas, aparece aquí.</div>`;
-  } else ORDEN.forEach(r=>{
-    const d=remote[r];
-    if(!d){ h+=`<div class="acard"><div class="atop"><div style="font-weight:600">${ROLES[r].nom}</div>
-      <span class="pill none">SIN CUBRIR</span></div></div>`; return; }
-    const est=d.estado.apertura;
-    const total=LISTAS[r].apertura.length, done=Object.keys(d.apertura||{}).length;
-    h+=`<div class="acard">
-      <div class="atop"><div><div style="font-weight:600;font-size:15px">${ROLES[r].nom}</div>
-      <div style="font-size:12.5px;color:var(--soft)">${d.persona||"— sin nombre —"}</div></div>
-      <span class="pill ${est==="listo"?"ok":(est==="pendientes"?"warn":"none")}">${est==="listo"?"LISTO":(est==="pendientes"?"PENDIENTES":"SIN REPORTAR")}</span></div>
-      <div class="stats">
-        <div class="stat">Cumplido<b>${total?Math.round(done/total*100):0}%</b></div>
-        <div class="stat">Llegada<b>${d.llegada?hhmm(d.llegada.at):"—"}</b></div>
-        <div class="stat">Confirmó<b>${d.confirmado.apertura?hhmm(d.confirmado.apertura.at):"—"}</b></div>
-      </div>
-      ${d.detalle.apertura?`<div class="flag warn">Pendiente: ${d.detalle.apertura}</div>`:""}
-      ${(d.agotados||[]).length?`<div class="flag bad">Agotados: ${d.agotados.join(", ")}</div>`:""}
-    </div>`;
+    h+=`<div class="acard"><div class="flag ok" style="margin:0">&#10003; Sin excepciones abiertas.</div></div>`;
+  } else abiertas.forEach(a=>{
+    h+=adRow(a.id, "sev-"+a.sev, tipoNom(a.tipo),
+      hhmm(a.at)+" &middot; "+a.estacion+(a.persona&&a.persona!=="—"?(" &middot; "+a.persona):""),
+      `<div class="rtxt">${a.desc}</div>
+       <button class="resbtn" data-res="${a.id}">Marcar como resuelta</button>`);
   });
 
-  /* --- Config --- */
-  h+=`<div class="sec">Configuración</div><div class="acard">
-    <label class="fl">Hora de entrada del personal</label>
-    <input type="text" id="entIn" value="${cfg.entrada}" inputmode="numeric" style="width:110px;text-align:center;font-family:'Space Grotesk'">
-    <div style="font-size:11.5px;color:var(--soft);margin:7px 0 16px">Contra esta hora se calcula A TIEMPO / TARDE. Solo se cambia aquí.</div>
-    <label class="fl">Hora límite de apertura</label>
-    <input type="text" id="limIn" value="${cfg.limite}" inputmode="numeric" style="width:110px;text-align:center;font-family:'Space Grotesk'">
-    <div style="font-size:11.5px;color:var(--soft);margin-top:7px">Pasada esta hora sin validación del punto, se genera alerta.</div>
-  </div>
-  <p class="hint" style="margin-top:16px">Las alertas se calculan cuando alguien abre esta vista. Todavía no se envían a ningún lado.</p>`;
+  if(cerradas.length){
+    h+=adRow("__cerradas","done","Resueltas hoy","("+cerradas.length+")",
+      cerradas.map(a=>{
+        const e=alertEstado[a.id];
+        return `<div style="padding-top:12px">
+          <div style="font-weight:600;font-size:13.5px">${tipoNom(a.tipo)} <span style="font-weight:400;color:var(--soft)">&middot; ${a.estacion}</span></div>
+          <div style="font-size:12.5px;color:var(--soft);margin-top:4px">${a.desc}</div>
+          <div style="font-size:12px;color:var(--ok);margin-top:5px;font-weight:600">Resuelta por ${e.por} a las ${hhmm(e.at)}${e.nota?(" &mdash; "+e.nota):""}</div>
+          <button class="linkbtn" data-reab="${a.id}" style="margin:8px 0 0;text-align:left">Reabrir</button>
+        </div>`;
+      }).join(""));
+  }
 
-  v.innerHTML=h;
+  h+=`</div><div>`;
+
+  /* 3. Estado de areas, detalle bajo demanda */
+  h+=`<div class="sec">Estado de áreas</div>`;
+  if(!ORDEN.some(r=>remote[r])){
+    h+=`<div class="empty" style="padding:30px 16px"><b>Sin reportes todavía.</b><br>Cuando el equipo registre llegada y confirme, aparece aquí.</div>`;
+  } else ORDEN.forEach(r=>{
+    const d=remote[r];
+    if(!d){
+      h+=adRow("ar_"+r,"",ROLES[r].nom,"Sin cubrir",
+        `<div class="rtxt" style="color:var(--soft)">Nadie tomó este puesto hoy.</div>`);
+      return;
+    }
+    const est=d.estado.apertura;
+    const total=LISTAS[r].apertura.length, done=Object.keys(d.apertura||{}).length;
+    const pc=total?Math.min(100,Math.round(done/total*100)):0;
+    const cls=est==="listo"?"st-ok":(est==="pendientes"?"st-warn":"");
+    const etq=est==="listo"?"Listo":(est==="pendientes"?"Con pendientes":"Sin reportar");
+    h+=adRow("ar_"+r, cls, ROLES[r].nom,
+      (d.persona||"&mdash; sin nombre &mdash;")+" &middot; "+etq+" &middot; "+pc+"%",
+      `<div class="mini">
+         <div>Cumplido<b>${pc}%</b></div>
+         <div>Tareas<b>${done}/${total}</b></div>
+         <div>Llegada<b>${d.llegada?hhmm(d.llegada.at):"—"}</b></div>
+         <div>Confirmó<b>${d.confirmado.apertura?hhmm(d.confirmado.apertura.at):"—"}</b></div>
+       </div>
+       ${d.llegada&&d.llegada.lateMin>0?`<div class="flag warn">Llegó ${d.llegada.lateMin} min tarde (esperada ${d.llegada.expected}).</div>`:""}
+       ${d.detalle.apertura?`<div class="flag warn">Pendiente: ${d.detalle.apertura}</div>`:""}
+       ${(d.agotados||[]).length?`<div class="flag bad">Agotados: ${d.agotados.join(", ")}</div>`:""}
+       ${r==="ensamble"&&d.cocina?`<div class="flag ${d.cocina.estado==="listo"?"ok":"warn"}">COCINA ${d.cocina.estado==="listo"?"LISTA":"CON PENDIENTES"}${d.cocina.detalle?(" &mdash; "+d.cocina.detalle):""}</div>`:""}`);
+  });
+
+  if(validacion){
+    const norm=validacion.estado==="listo";
+    const extra=(validacion.detalle?1:0)+((validacion.faltan||[]).length?1:0)+(validacion.snapshot?1:0);
+    h+=`<div class="sec">Validación del punto</div>`;
+    h+=adRow("__val", norm?"st-ok":"st-warn",
+      norm?"Apertura normal":"Apertura con novedad",
+      "Validó "+validacion.por+" &middot; "+hhmm(validacion.at),
+      `${validacion.detalle?`<div class="flag warn">${validacion.detalle}</div>`:""}
+       ${(validacion.faltan||[]).length?`<div class="flag warn">Al validar faltaba: ${validacion.faltan.join(" &middot; ")}</div>`:""}
+       ${validacion.snapshot?`<div class="rtxt" style="font-size:12px;color:var(--soft)">Estado al validar &mdash; ${validacion.snapshot}</div>`:""}
+       ${extra?"":`<div class="rtxt" style="color:var(--soft)">Sin observaciones.</div>`}`);
+  }
+
+  h+=`</div></div>`;
+
+  v.innerHTML=h; wireAdmin(v);
+}
+
+function wireAdmin(v){
+  v.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>{
+    adminTab=b.dataset.tab; renderAdmin(); window.scrollTo(0,0);
+  }));
+  /* Abrir y cerrar sin repintar: no se pierde el scroll ni el resto de lo abierto. */
+  v.querySelectorAll("[data-tog]").forEach(b=>b.addEventListener("click",()=>{
+    const k=b.dataset.tog;
+    if(adminOpen.has(k)) adminOpen.delete(k); else adminOpen.add(k);
+    b.closest(".row").classList.toggle("open", adminOpen.has(k));
+  }));
   v.querySelectorAll("[data-res]").forEach(b=>b.addEventListener("click",()=>resolverAlerta(b.dataset.res)));
   v.querySelectorAll("[data-reab]").forEach(b=>b.addEventListener("click",()=>reabrirAlerta(b.dataset.reab)));
-  const li=$("limIn");
+  const li=v.querySelector("#limIn");
   if(li) li.addEventListener("change",e=>{ cfg.limite=e.target.value.trim()||"17:00"; pushCfg(); });
-  const en=$("entIn");
+  const en=v.querySelector("#entIn");
   if(en) en.addEventListener("change",e=>{ cfg.entrada=e.target.value.trim()||"16:30"; pushCfg(); });
 }
 
@@ -950,6 +1064,8 @@ function pintaReal(){
   $("claimView").classList.toggle("hide", view!=="claim");
   $("turnView").classList.toggle("hide", view!=="turn");
   $("adminView").classList.toggle("hide", view!=="admin");
+  /* Admin necesita ancho en escritorio; el turno se queda angosto a propósito. */
+  document.body.classList.toggle("adminwide", view==="admin");
   $("roleTabs").classList.toggle("hide", view!=="turn"||me.roles.length<2);
   $("phaseTabs").classList.toggle("hide", view!=="turn");
   $("adminBtn").classList.toggle("on", view==="admin");
