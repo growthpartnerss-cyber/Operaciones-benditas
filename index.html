@@ -225,6 +225,11 @@ ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .mini div{font-size:11.5px;color:var(--soft)}
 .mini b{display:block;font:600 15px 'Space Grotesk';color:var(--ink)}
 .rtxt{padding-top:12px;font-size:13.5px;line-height:1.5}
+.pline{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.pline:last-child{border-bottom:none;padding-bottom:0}
+.pline .n{font-size:15px;font-weight:500;line-height:1.3}
+.pline .w{display:block;font-size:12px;color:var(--soft);font-weight:400;margin-top:2px}
+.pline .q{font:600 15px 'Space Grotesk';white-space:nowrap}
 
 @media (min-width:900px){
   .adcols{display:grid;grid-template-columns:1.3fr 1fr;gap:26px;align-items:start}
@@ -1076,6 +1081,23 @@ function renderAdmin(){
        ${(d.agotados||[]).length?`<div class="flag bad">Agotados: ${d.agotados.join(", ")}</div>`:""}
        ${r==="ensamble"&&d.cocina?`<div class="flag ${d.cocina.estado==="listo"?"ok":"warn"}">COCINA ${d.cocina.estado==="listo"?"LISTA":"CON PENDIENTES"}${d.cocina.detalle?(" &mdash; "+d.cocina.detalle):""}</div>`:""}`);
   });
+
+  /* Produccion: informativa y nada mas. No entra al veredicto ni genera
+     alerta, porque una estacion puede abrir con produccion por hacer. */
+  {
+    const prods=Object.keys(produccion);
+    h+=`<div class="sec">Producción de cocina</div>`;
+    h+=adRow("__prod","","Producción de cocina",
+      prods.length? (prods.length===1?"1 producto registrado":prods.length+" productos registrados")
+                  : "Sin producción registrada hoy",
+      prods.length
+        ? prods.map(n=>{
+            const p=produccion[n];
+            return `<div class="pline"><div class="n">${n}<span class="w">${p.por} &middot; ${hhmm(p.at)}</span></div>
+              <div class="q">${p.pax} PAX</div></div>`;
+          }).join("")
+        : `<div class="rtxt" style="color:var(--soft)">No todos los días se produce todo. Esto no afecta la apertura del punto.</div>`);
+  }
 
   if(validacion){
     const norm=validacion.estado==="listo";
