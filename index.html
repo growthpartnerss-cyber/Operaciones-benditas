@@ -342,8 +342,8 @@ const PUNTO = "podium";           // diseñado para varios puntos, construido pa
 const PUNTO_NOMBRE = "Podium · Valle de Lili";
 
 const ROLES = {
-  plancha:  {nom:"Plancha",              desc:"Su estación · reporta su estado a Ensamble"},
-  ensamble: {nom:"Parrilla / Ensamble",  desc:"Su estación · comunica el estado de COCINA"},
+  plancha:  {nom:"Plancha",              desc:"Llega a medio turno y recibe su estación"},
+  ensamble: {nom:"Parrilla / Ensamble",  desc:"Abre COCINA y comunica su estado al Cajero"},
   servicio: {nom:"Mesero / Servicio",    desc:"Salón, clientes y servicio"},
   caja:     {nom:"Cajero / Encargado",   desc:"Caja y pedidos · valida el punto"}
 };
@@ -356,19 +356,23 @@ const PRODUCCION = ["Maíz","Tocineta","Quesos","Carnes","Arepas","Maduro",
 
 const LISTAS = {
   plancha:{
-    apertura:[["Lavado de manos y uniforme",0],["Proteínas refrigeradas sacadas (PEPS)",0],
-      ["Congelados en orden de salida",0],["Arepas pre-alistadas",0],
-      ["Plancha encendida y en temperatura",1],["Estación y utensilios limpios",0]],
+    /* Plancha llega a medio turno y NO repite la apertura de cocina:
+       recibe una estacion que Ensamble ya dejo andando. */
+    apertura:[["Estación de plancha verificada y recibida",0],
+      ["Equipos e insumos necesarios disponibles",0]],
     cierre:[["Gas cerrado",1],["Extractor y equipos apagados",1],["Plancha limpia",0],
       ["Paredes y piso de la estación",0],["Faltantes y novedades reportados",0]]
   },
   ensamble:{
-    /* Recorrido real de preparación. Un control por etapa, no uno por insumo. */
+    /* Ensamble abre la cocina solo: Plancha llega a medio turno.
+       Un control por etapa del recorrido real, no uno por insumo. */
     apertura:[["Estación de ensamble montada (pinzas, cuchillos, cucharas de madera y demás utensilios)",0],
-      ["Estación abastecida (salsas, guacamole, toppings, cebolla encurtida, jalapeño, quesos)",0],
-      ["Verduras necesarias preparadas (lechuga, tomate en cubos, rodajas para hamburguesa)",0],
-      ["Parrilla preparada (encendida y en temperatura)",1],
-      ["Arepas iniciales adelantadas",0]],
+      ["Estación abastecida (salsas, guacamole, toppings, quesos y demás insumos)",0],
+      ["Verduras listas para servicio (lechuga, tomate en cubos, rodajas para hamburguesa)",0],
+      ["Parrilla encendida y precalentada",1],
+      ["Arepas iniciales adelantadas para comenzar el servicio",0],
+      ["Insumos para descongelación retirados y en azafatas, con PEPS",0],
+      ["Plancha operativa para el inicio del servicio, mientras llega su responsable",0]],
     cierre:[["Crudo y cocido separados",1],["Parrilla y mesa de ensamble limpias",0],
       ["Toppings guardados y tapados",0],["Neveras organizadas",0],["Piso trapeado",0]]
   },
@@ -598,8 +602,8 @@ function renderTurn(){
         <div class="arres">
           ${d.llegada.foto?`<img src="${d.llegada.foto}" alt="">`:""}
           <span class="t">${hhmm(d.llegada.at)}</span>
-          <span class="badge ${lm>0?"bad":"ok"}">${lm>0?("Tarde · "+lm+" min"):"A tiempo"}</span>
-          <span class="m">Esperada ${d.llegada.expected} · registrada por ${d.persona||"—"}${d.llegada.sinFoto?" · sin foto":""}</span>
+          ${lm===null?"":`<span class="badge ${lm>0?"bad":"ok"}">${lm>0?("Tarde · "+lm+" min"):"A tiempo"}</span>`}
+          <span class="m">${lm===null?"Sin hora esperada definida":("Esperada "+d.llegada.expected)} · registrada por ${d.persona||"—"}${d.llegada.sinFoto?" · sin foto":""}</span>
         </div></div>`;
     } else {
       h+=`<div class="arr"><div class="hd">Registra tu llegada <span class="tag">CONTROL HORARIO</span></div>
@@ -643,10 +647,21 @@ function renderTurn(){
     </div>`;
   }
 
-  /* Ensamble recibe Plancha */
+  /* Plancha recibe una cocina que Ensamble ya abrio */
+  if(rol==="plancha" && phase==="apertura"){
+    h+=`<div class="sec">Cocina que recibes</div>`+cocinaTile();
+    h+=`<div class="lock">🔒 La apertura de cocina la hizo Ensamble. Tú no la repites: recibes tu estación.</div>`;
+  }
+
+  /* Ensamble ve a Plancha cuando llega, pero no la espera para abrir */
   if(rol==="ensamble" && phase==="apertura"){
-    h+=`<div class="sec">Estado recibido</div>`+tileHTML("plancha","apertura");
-    h+=`<div class="lock">🔒 Solo Plancha puede confirmar su estación.</div>`;
+    const pl=getRol("plancha");
+    h+=`<div class="sec">Plancha</div>`;
+    h+=pl.llegada
+      ? tileHTML("plancha","apertura")
+      : `<div class="tile"><div class="dot"></div><div style="flex:1">
+          <div class="nm">Plancha todavía no llega</div>
+          <div class="mt">Llega a medio turno y recibe su estación. No la esperes para abrir cocina.</div></div></div>`;
   }
 
   /* Caja recibe todo */
@@ -677,12 +692,12 @@ function renderTurn(){
   } else {
     const puedeVerde = done===total && (phase==="cierre" || d.llegada);
     if(rol==="ensamble"&&phase==="apertura"){
-      const pl=getRol("plancha");
-      const plOk = pl.estado.apertura==="listo";
-      h+=`<div class="cbtns">
-        <button class="cbtn green" id="cOk" ${puedeVerde&&plOk?"":"disabled"}>🟢 COCINA LISTA</button>
-        <button class="cbtn amber" id="cWarn">🟠 COCINA CON PENDIENTES</button></div>
-        <p class="hint">${!plOk?"Plancha todavía no confirma su estación. Puedes reportar cocina con pendientes para no frenar la apertura.":(puedeVerde?"Tu estación y Plancha están listas.":"Te faltan tareas de tu estación.")}</p>`;
+      /* Ensamble abre cocina solo. Plancha llega despues y no condiciona esto. */
+      h+=`<div style="font:700 15px 'Space Grotesk';text-align:center;margin-bottom:11px">¿Cocina puede recibir pedidos?</div>
+        <div class="cbtns">
+        <button class="cbtn green" id="cOk" ${puedeVerde?"":"disabled"}>🟢 COCINA LISTA PARA SERVICIO</button>
+        <button class="cbtn amber" id="cWarn">🟠 COCINA CON NOVEDAD</button></div>
+        <p class="hint">${puedeVerde?"Esto es lo que le llega al Cajero para validar el punto.":(!d.llegada?"Primero registra tu llegada.":"Te faltan tareas de la apertura de cocina.")}</p>`;
     } else if(rol==="caja"&&phase==="apertura"){
       const est=estadoPunto();
       h+=`<div class="cbtns">
@@ -690,10 +705,14 @@ function renderTurn(){
         <button class="cbtn amber" id="cWarn" ${puedeVerde?"":"disabled"}>🟠 VALIDAR CON PENDIENTES</button></div>
         <p class="hint">${!puedeVerde?"Registra tu llegada y completa tu caja para poder validar.":(est.todoOk?"Todas las áreas reportaron listo.":"Hay áreas sin reportar o con pendientes: "+est.faltan.join(", ")+". Puedes abrir igual validando con pendientes.")}</p>`;
     } else {
-      h+=`<div class="cbtns">
-        <button class="cbtn green" id="cOk" ${puedeVerde?"":"disabled"}>🟢 ${phase==="apertura"?(rol==="plancha"?"PLANCHA LISTA":"SERVICIO LISTO"):"CIERRE COMPLETO"}</button>
-        <button class="cbtn amber" id="cWarn">🟠 ${phase==="apertura"?(rol==="plancha"?"PLANCHA CON PENDIENTES":"SERVICIO CON PENDIENTES"):"CIERRE CON PENDIENTES"}</button></div>
-        <p class="hint">${puedeVerde?"Confirma para que tu área quede reportada.":(phase==="apertura"&&!d.llegada?"Primero registra tu llegada.":"Te faltan tareas. Si no se pueden hacer, repórtalo con pendientes.")}</p>`;
+      const tomaPlancha = rol==="plancha" && phase==="apertura";
+      h+=`${tomaPlancha?`<div style="font:700 15px 'Space Grotesk';text-align:center;margin-bottom:11px">¿Recibes la estación?</div>`:""}
+        <div class="cbtns">
+        <button class="cbtn green" id="cOk" ${puedeVerde?"":"disabled"}>🟢 ${phase==="apertura"?(rol==="plancha"?"PLANCHA RECIBIDA CORRECTAMENTE":"SERVICIO LISTO"):"CIERRE COMPLETO"}</button>
+        <button class="cbtn amber" id="cWarn">🟠 ${phase==="apertura"?(rol==="plancha"?"PLANCHA RECIBIDA CON NOVEDAD":"SERVICIO CON PENDIENTES"):"CIERRE CON PENDIENTES"}</button></div>
+        <p class="hint">${tomaPlancha
+          ? (puedeVerde?"Desde que confirmes, la estación queda a tu nombre.":(!d.llegada?"Primero registra tu llegada.":"Verifica la estación antes de recibirla."))
+          : (puedeVerde?"Confirma para que tu área quede reportada.":(phase==="apertura"&&!d.llegada?"Primero registra tu llegada.":"Te faltan tareas. Si no se pueden hacer, repórtalo con pendientes."))}</p>`;
     }
   }
   h+=`</div>`;
@@ -823,7 +842,11 @@ function wireTurn(rol){
     if(file){ try{ foto=await shrink(file); }catch(e){ foto=null; } }
     const dd=getRol(rol);
     dd.expected=exp; dd.persona=dd.persona||me.nombre;
-    dd.llegada={at:now,expected:exp,lateMin:lateMin(now,exp),foto,sinFoto:!foto};
+    /* Plancha entra a medio turno: contra la hora de apertura siempre saldria
+       tarde, y eso no es una tardanza real. Se guarda la hora sin veredicto
+       hasta que administracion defina su hora de entrada. */
+    const conHora = rol!=="plancha";
+    dd.llegada={at:now, expected:conHora?exp:null, lateMin:conHora?lateMin(now,exp):null, foto, sinFoto:!foto};
     pushRol(rol,dd);
   }
   const ap=$("arrPhoto");
@@ -967,10 +990,13 @@ function computeAlertas(){
 
   ORDEN.forEach(r=>{
     const d=remote[r];
-    if(!d){ if(pasoLimite()) add("rol_sin_cubrir",r,"Nadie tomó este puesto hoy.","alta"); return; }
+    /* Plancha llega a medio turno: no se le puede reclamar a la hora de apertura.
+       Avisar todos los dias a las 17:00 que "falta Plancha" seria ruido fijo. */
+    const esperadoEnApertura = r!=="plancha";
+    if(!d){ if(pasoLimite() && esperadoEnApertura) add("rol_sin_cubrir",r,"Nadie tomó este puesto hoy.","alta"); return; }
     if(d.llegada && d.llegada.lateMin>0)
       add("llegada_tarde",r,(d.persona||"—")+" llegó "+hhmm(d.llegada.at)+", "+d.llegada.lateMin+" min tarde (esperada "+d.llegada.expected+").","media",d.llegada.at);
-    if(!d.llegada && pasoLimite())
+    if(!d.llegada && pasoLimite() && esperadoEnApertura)
       add("sin_llegada",r,"Sin registro de llegada pasada la hora límite.","alta");
     if(d.estado.apertura==="pendientes" && r!=="ensamble")
       add("area_pendientes",r,(d.detalle.apertura||"Sin detalle."),"alta",d.confirmado.apertura?d.confirmado.apertura.at:Date.now());
