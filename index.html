@@ -996,13 +996,29 @@ function computeAlertas(){
      a media tarde de algo que se produce en la noche seria puro ruido. */
   const cerroCocina = COCINA.filter(r=>remote[r] && remote[r].confirmado.cierre);
   if(cerroCocina.length){
+    const at = Math.max.apply(null, cerroCocina.map(r=>remote[r].confirmado.cierre.at));
+    const deCocina = ()=>{ A[A.length-1].estacion="Cocina"; };
+
+    /* Lo que se pidio y no se hizo */
     const faltan = planHoy().filter(it=>!produccion[it.p]);
     if(faltan.length){
-      const at = Math.max.apply(null, cerroCocina.map(r=>remote[r].confirmado.cierre.at));
       add("produccion_pendiente",null,
         "Cocina cerró sin registrar "+(faltan.length===1?"una producción indicada":faltan.length+" producciones indicadas")+" para hoy: "
         +faltan.map(x=>x.p+" ("+x.pax+" PAX)").join(" · ")+".","alta",at);
-      A[A.length-1].estacion="Cocina";
+      deCocina();
+    }
+
+    /* Lo que salio distinto al optimo y nadie dijo por que */
+    const sinNota = planHoy().filter(it=>{
+      const p=produccion[it.p];
+      return p && p.pax!==it.pax && !(p.nota && p.nota.trim());
+    });
+    if(sinNota.length){
+      add("produccion_sin_explicar",null,
+        "Cocina cerró con "+(sinNota.length===1?"una diferencia":sinNota.length+" diferencias")+" de producción sin explicar: "
+        +sinNota.map(it=>{ const p=produccion[it.p], d=p.pax-it.pax;
+          return it.p+" "+p.pax+"/"+it.pax+" ("+(d>0?"+":"")+d+", lo registró "+p.por+")"; }).join(" · ")+".","media",at);
+      deCocina();
     }
   }
 
@@ -1287,6 +1303,7 @@ function tipoNom(t){
     apertura_con_novedad:"Apertura con novedad abierta",
     validacion_tarde:"Punto sin validar",
     produccion_pendiente:"Producción indicada sin registrar",
+    produccion_sin_explicar:"Diferencia de producción sin explicar",
     marcacion_bloque:"Marcación en bloque"
   })[t]||t;
 }
