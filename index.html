@@ -14,7 +14,7 @@
   --line:#E6E1D6; --line2:#D6CFBF;
   --maiz:#D98A00; --maiz2:#B87200; --maizT:#FCEFD3;
   --ok:#2E7D46; --okT:#E4F0E7;
-  --warn:#C8880B; --warnT:#FBF0CE;
+  --warn:#C8880B; --warnT:#FBF0CE; --warnTxt:#8A5A00;
   --bad:#C0392B; --badT:#F7E1DD;
   --sh:0 1px 2px rgba(28,24,19,.05),0 6px 20px rgba(28,24,19,.06);
   --r:14px;
@@ -22,13 +22,13 @@
 :root:not([data-theme="light"]){@media (prefers-color-scheme:dark){
   --paper:#17150F; --surface:#211E17; --ink:#F3EFE6; --soft:#A69C89;
   --line:#332F26; --line2:#413C30;
-  --maizT:#3A2E12; --okT:#16261A; --warnT:#332A10; --badT:#2E1713;
+  --maizT:#3A2E12; --okT:#16261A; --warnT:#332A10; --warnTxt:#C8880B; --badT:#2E1713;
   --sh:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
 }}
 :root[data-theme="dark"]{
   --paper:#17150F; --surface:#211E17; --ink:#F3EFE6; --soft:#A69C89;
   --line:#332F26; --line2:#413C30;
-  --maizT:#3A2E12; --okT:#16261A; --warnT:#332A10; --badT:#2E1713;
+  --maizT:#3A2E12; --okT:#16261A; --warnT:#332A10; --warnTxt:#C8880B; --badT:#2E1713;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0}
@@ -144,6 +144,8 @@ ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 .prod input.pax{flex:0 0 72px;width:72px;text-align:center;font:600 15px 'Space Grotesk';padding:9px 4px}
 .prod button.pg{flex:none;border:1px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:9px;padding:9px 13px;font:600 13px 'Inter',sans-serif}
 .prod .tick.off{background:transparent;border:2px solid var(--line2)}
+.prod .tick.dif{background:var(--warnTxt)}
+.prod.pendexp{border-left:3px solid var(--warn);padding-left:9px;margin-left:-12px}
 .prod .ajeno{flex:none;font-size:14px;opacity:.5}
 .prodotro{display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
 .prodotro .addrow{margin-top:0}
@@ -390,7 +392,10 @@ const LS = "br_ap_v2";
 let db = null, dbReady = false;
 let remote = {};                 // rol -> doc (fuente compartida)
 let validacion = null;
-let produccion = {};             // producto -> {pax, por, at}; compartido por cocina
+let produccion = {};             // producto -> {pax, por, at, nota}; compartido por cocina
+let plan = {};                   // dia de la semana (0-6) -> [{p, pax}]; lo arma administracion
+const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+function planHoy(){ return plan[new Date().getDay()] || []; }
 let alertEstado = {};            // idAlerta -> {resuelta, por, at, nota}
 let cfg = {limite:"17:00", entrada:"16:30"};  // limite de validacion + hora de entrada
 let adminNombre = "";
@@ -439,6 +444,7 @@ function aplicar(r){
   if(r.tipo==="rol"){ if(r.data&&r.data.rol) remote[r.data.rol]=r.data; }
   else if(r.tipo==="validacion") validacion=r.data;
   else if(r.tipo==="produccion") produccion=r.data||{};
+  else if(r.tipo==="plan") plan=r.data||{};
   else if(r.tipo==="alertas") alertEstado=(r.data&&r.data.estados)||{};
   else if(r.tipo==="config"){ if(r.data&&r.data.limite) cfg.limite=r.data.limite; if(r.data&&r.data.entrada) cfg.entrada=r.data.entrada; }
 }
@@ -488,6 +494,8 @@ async function pushRol(rol,data){
 }
 async function pushVal(v){ validacion=v; rerender(); await guardar("validacion","validacion",v); }
 async function pushProd(){ rerender(); await guardar("produccion","dia",produccion); }
+/* El plan es configuracion, no dato del dia: vive en fecha "config" y se repite cada semana. */
+async function pushPlan(){ rerender(); await guardar("plan","semana",plan,"config"); }
 async function pushAlert(){ rerender(); await guardar("alertas","alertas",{estados:alertEstado}); }
 async function pushCfg(){ rerender(); await guardar("config","general",{limite:cfg.limite,entrada:cfg.entrada},"config"); }
 
@@ -723,29 +731,63 @@ function estadoPunto(){
    No suma al % de la estacion ni bloquea la confirmacion: una estacion puede
    estar lista para operar con produccion todavia por hacer.
    Lo que no se marca NO es incumplimiento: no todos los dias se produce todo. */
+/* Produccion del dia. Ya no es una lista fija donde cocina elige: sale de la
+   plantilla semanal que arma administracion, asi que a cocina solo le aparece
+   lo que le toca hoy. Igual puede registrar algo fuera del plan.
+   Sigue sin sumar al % de la estacion y sin bloquear la confirmacion. */
 function prodHTML(){
-  const extra = Object.keys(produccion).filter(k=>!PRODUCCION.includes(k));
-  let h=`<div class="sec">Producción de cocina</div><div class="card">
-    <div style="font-size:12.5px;color:var(--soft);margin-bottom:6px">La registra quien la haya hecho, Plancha o Ensamble. No todos los días se produce todo: lo que no se marca no cuenta como incumplimiento.</div>`;
-  PRODUCCION.concat(extra).forEach(n=>{
-    const p=produccion[n];
+  const hoy = planHoy();
+  const enPlan = hoy.map(x=>x.p);
+  const fuera = Object.keys(produccion).filter(k=>!enPlan.includes(k));
+
+  let h=`<div class="sec">Producción de hoy</div><div class="card">`;
+
+  if(!hoy.length && !fuera.length){
+    h+=`<div style="font-size:13px;color:var(--soft)">Hoy no hay producción indicada. Si igual produces algo, regístralo abajo.</div>`;
+  } else {
+    h+=`<div style="font-size:12.5px;color:var(--soft);margin-bottom:6px">Lo indicado para hoy por administración. La registra quien la haya hecho, Plancha o Ensamble.</div>`;
+  }
+
+  hoy.forEach(it=>{
+    const n=it.p, meta=it.pax, p=produccion[n];
     if(!p){
       h+=`<div class="prod">
         <div class="tick off"></div>
-        <div class="pn">${n}</div>
-        <input type="number" class="pax" min="1" inputmode="numeric" placeholder="PAX">
+        <div class="pn">${n}<span class="pd">Óptimo ${meta} PAX</span></div>
+        <input type="number" class="pax" min="1" inputmode="numeric" placeholder="${meta}">
         <button class="pg" data-prod="${n}">Registrar</button></div>`;
     } else {
       const mio = p.por === (me.nombre||"");
-      h+=`<div class="prod hecho">
-        <div class="tick">✓</div>
-        <div class="pn">${n}<span class="pd">${p.pax} PAX · ${p.por} · ${hhmm(p.at)}</span></div>
+      const dif = p.pax - meta;
+      const faltaExplicar = dif!==0 && !(p.nota&&p.nota.trim());
+      h+=`<div class="prod hecho${faltaExplicar?" pendexp":""}">
+        <div class="tick${dif?" dif":""}">${dif?"!":"✓"}</div>
+        <div class="pn">${n}<span class="pd">${p.pax} PAX de ${meta}${dif?(" &middot; "+(dif>0?"+":"")+dif):""} &middot; ${p.por} &middot; ${hhmm(p.at)}</span>
+          ${p.nota?`<span class="pd" style="color:var(--warnTxt)">${p.nota}</span>`:""}</div>
         ${mio?`<button class="pg" data-undo="${n}">Corregir</button>`
              :`<span class="ajeno" title="Lo registró ${p.por}">🔒</span>`}</div>`;
+      if(faltaExplicar && mio){
+        h+=`<div class="addrow" style="margin:0 0 11px 35px">
+          <input type="text" class="notaDif" data-nota="${n}" placeholder="¿Por qué la diferencia?">
+          <button data-notaok="${n}">Guardar</button></div>`;
+      } else if(faltaExplicar){
+        h+=`<div style="font-size:12px;color:var(--warnTxt);margin:0 0 11px 35px">Falta que ${p.por} explique la diferencia.</div>`;
+      }
     }
   });
+
+  /* Lo que se produjo sin estar en el plan del dia */
+  fuera.forEach(n=>{
+    const p=produccion[n], mio = p.por === (me.nombre||"");
+    h+=`<div class="prod hecho">
+      <div class="tick">✓</div>
+      <div class="pn">${n}<span class="pd">${p.pax} PAX &middot; ${p.por} &middot; ${hhmm(p.at)} &middot; fuera del plan</span></div>
+      ${mio?`<button class="pg" data-undo="${n}">Corregir</button>`
+           :`<span class="ajeno" title="Lo registró ${p.por}">🔒</span>`}</div>`;
+  });
+
   h+=`<div class="prodotro">
-      <input type="text" id="prodOtro" placeholder="Otro producto">
+      <input type="text" id="prodOtro" placeholder="Otro producto (fuera del plan)">
       <div class="addrow">
         <input type="number" id="prodOtroPax" min="1" inputmode="numeric" placeholder="PAX"
                style="text-align:center;font-family:'Space Grotesk';font-weight:600">
@@ -827,6 +869,17 @@ function wireTurn(rol){
     }));
     tv.querySelectorAll("[data-undo]").forEach(b=>b.addEventListener("click",()=>{
       delete produccion[b.dataset.undo]; pushProd();
+    }));
+    /* La explicacion de la diferencia: se guarda aparte, sin rehacer el registro */
+    const guardarNota=n=>{
+      const inp=tv.querySelector('[data-nota="'+n.replace(/"/g,'\\"')+'"]');
+      const t=(inp&&inp.value||"").trim();
+      if(!t){ if(inp){ inp.style.outline="2px solid var(--bad)"; inp.focus(); } return; }
+      if(produccion[n]){ produccion[n].nota=t; pushProd(); }
+    };
+    tv.querySelectorAll("[data-notaok]").forEach(b=>b.addEventListener("click",()=>guardarNota(b.dataset.notaok)));
+    tv.querySelectorAll("[data-nota]").forEach(i=>i.addEventListener("keydown",e=>{
+      if(e.key==="Enter") guardarNota(i.dataset.nota);
     }));
     const po=$("prodOtroAdd");
     if(po) po.addEventListener("click",()=>{
@@ -963,6 +1016,7 @@ function reabrirAlerta(id){ delete alertEstado[id]; pushAlert(); }
    Vive fuera del render para que una actualización de otro dispositivo
    no le cierre en la cara lo que el admin acaba de abrir. */
 let adminTab = "sup";
+let planDia = new Date().getDay();   // dia que se esta editando en Ajustes
 const adminOpen = new Set();
 
 /* Una sola respuesta a "el punto opera normal o requiere atención". */
@@ -998,11 +1052,38 @@ function adminAjustes(){
     <input type="text" id="limIn" value="${cfg.limite}" inputmode="numeric" style="width:120px;text-align:center;font-family:'Space Grotesk'">
     <div style="font-size:11.5px;color:var(--soft);margin-top:7px">Pasada esta hora sin validación del punto, se genera alerta.</div>
   </div>
+  ${planEditor()}
   <div class="acard">
     <div style="font-weight:600;font-size:14px">PIN del punto y PIN de administración</div>
     <div style="font-size:12.5px;color:var(--soft);line-height:1.5;margin-top:5px">Hoy están fijos en el código. Cambiarlos necesita subir una versión nueva de la app.</div>
   </div>
   <p class="hint" style="margin-top:16px">Las alertas se calculan cuando alguien abre esta vista. Todavía no se envían a ningún lado.</p>`;
+}
+
+/* Plantilla semanal de produccion. Se repite cada semana; a cocina le aparece
+   solo lo del dia que corresponde. */
+function planEditor(){
+  const lista = plan[planDia] || [];
+  return `<div class="acard">
+    <div style="font-weight:600;font-size:15px;margin-bottom:3px">Producción por día</div>
+    <div style="font-size:12.5px;color:var(--soft);line-height:1.5;margin-bottom:13px">Lo que definas aquí se repite cada semana. A cocina le aparece solo lo de hoy, con la cantidad óptima; si sale distinto, tiene que explicar por qué.</div>
+    <label class="fl">Día</label>
+    <select id="planDia">${DIAS.map((d,i)=>`<option value="${i}"${i===planDia?" selected":""}>${d}</option>`).join("")}</select>
+    <div style="margin-top:14px">
+      ${lista.length? lista.map((it,i)=>`<div class="prod">
+          <div class="pn">${it.p}<span class="pd">Óptimo ${it.pax} PAX</span></div>
+          <button class="pg" data-planDel="${i}">Quitar</button></div>`).join("")
+        : `<div style="font-size:13px;color:var(--soft);padding:6px 0">Sin producción indicada para ${DIAS[planDia].toLowerCase()}.</div>`}
+    </div>
+    <div class="prodotro">
+      <input type="text" id="planP" list="planProds" placeholder="Producto">
+      <datalist id="planProds">${PRODUCCION.map(p=>`<option value="${p}">`).join("")}</datalist>
+      <div class="addrow">
+        <input type="number" id="planPax" min="1" inputmode="numeric" placeholder="PAX óptimo"
+               style="text-align:center;font-family:'Space Grotesk';font-weight:600">
+        <button id="planAdd">Agregar</button></div>
+    </div>
+  </div>`;
 }
 
 function renderAdmin(){
@@ -1091,18 +1172,40 @@ function renderAdmin(){
   /* Produccion: informativa y nada mas. No entra al veredicto ni genera
      alerta, porque una estacion puede abrir con produccion por hacer. */
   {
-    const prods=Object.keys(produccion);
-    h+=`<div class="sec">Producción de cocina</div>`;
-    h+=adRow("__prod","","Producción de cocina",
-      prods.length? (prods.length===1?"1 producto registrado":prods.length+" productos registrados")
-                  : "Sin producción registrada hoy",
-      prods.length
-        ? prods.map(n=>{
-            const p=produccion[n];
-            return `<div class="pline"><div class="n">${n}<span class="w">${p.por} &middot; ${hhmm(p.at)}</span></div>
-              <div class="q">${p.pax} PAX</div></div>`;
-          }).join("")
-        : `<div class="rtxt" style="color:var(--soft)">No todos los días se produce todo. Esto no afecta la apertura del punto.</div>`);
+    const hoy=planHoy(), enPlan=hoy.map(x=>x.p);
+    const fuera=Object.keys(produccion).filter(k=>!enPlan.includes(k));
+    const faltan=hoy.filter(it=>!produccion[it.p]).length;
+    const condif=hoy.filter(it=>produccion[it.p] && produccion[it.p].pax!==it.pax).length;
+
+    let cuerpo="";
+    hoy.forEach(it=>{
+      const p=produccion[it.p];
+      if(!p){
+        cuerpo+=`<div class="pline"><div class="n" style="color:var(--soft)">${it.p}<span class="w">Sin registrar</span></div>
+          <div class="q" style="color:var(--soft)">— / ${it.pax}</div></div>`;
+      } else {
+        const dif=p.pax-it.pax;
+        cuerpo+=`<div class="pline"><div class="n">${it.p}<span class="w">${p.por} &middot; ${hhmm(p.at)}${p.nota?(" &middot; "+p.nota):(dif?" &middot; sin explicar":"")}</span></div>
+          <div class="q"${dif?' style="color:var(--warnTxt)"':""}>${p.pax} / ${it.pax}</div></div>`;
+      }
+    });
+    fuera.forEach(n=>{
+      const p=produccion[n];
+      cuerpo+=`<div class="pline"><div class="n">${n}<span class="w">${p.por} &middot; ${hhmm(p.at)} &middot; fuera del plan</span></div>
+        <div class="q">${p.pax} PAX</div></div>`;
+    });
+    if(!cuerpo) cuerpo=`<div class="rtxt" style="color:var(--soft)">Hoy no hay producción indicada en la plantilla, y no se registró nada fuera de plan.</div>`;
+
+    const meta = !hoy.length && !fuera.length ? "Sin producción indicada para hoy"
+      : [ faltan?(faltan+" sin registrar"):null,
+          condif?(condif+" con diferencia"):null,
+          fuera.length?(fuera.length+" fuera del plan"):null,
+          (!faltan&&!condif&&hoy.length)?"Todo según lo indicado":null
+        ].filter(Boolean).join(" · ");
+
+    h+=`<div class="sec">Producción de hoy</div>`;
+    h+=adRow("__prod", faltan?"st-warn":(condif?"st-warn":(hoy.length?"st-ok":"")),
+      "Producción de hoy", meta, cuerpo);
   }
 
   if(validacion){
@@ -1135,6 +1238,22 @@ function wireAdmin(v){
   }));
   v.querySelectorAll("[data-res]").forEach(b=>b.addEventListener("click",()=>resolverAlerta(b.dataset.res)));
   v.querySelectorAll("[data-reab]").forEach(b=>b.addEventListener("click",()=>reabrirAlerta(b.dataset.reab)));
+  const pd=v.querySelector("#planDia");
+  if(pd) pd.addEventListener("change",e=>{ planDia=+e.target.value; renderAdmin(); });
+  const pa=v.querySelector("#planAdd");
+  if(pa) pa.addEventListener("click",()=>{
+    const p=(v.querySelector("#planP").value||"").trim();
+    const pax=parseInt(v.querySelector("#planPax").value,10);
+    if(!p){ v.querySelector("#planP").style.outline="2px solid var(--bad)"; return; }
+    if(!(pax>0)){ v.querySelector("#planPax").style.outline="2px solid var(--bad)"; return; }
+    const l=(plan[planDia]||[]).slice();
+    if(l.some(x=>x.p===p)){ v.querySelector("#planP").style.outline="2px solid var(--bad)"; return; }
+    l.push({p,pax}); plan[planDia]=l; pushPlan();
+  });
+  v.querySelectorAll("[data-planDel]").forEach(b=>b.addEventListener("click",()=>{
+    const l=(plan[planDia]||[]).slice(); l.splice(+b.dataset.plandel,1);
+    plan[planDia]=l; pushPlan();
+  }));
   const li=v.querySelector("#limIn");
   if(li) li.addEventListener("change",e=>{ cfg.limite=e.target.value.trim()||"17:00"; pushCfg(); });
   const en=v.querySelector("#entIn");
