@@ -321,7 +321,7 @@ const PUNTO = "podium";           // diseñado para varios puntos, construido pa
 const PUNTO_NOMBRE = "Podium · Valle de Lili";
 
 const ROLES = {
-  plancha:  {nom:"Plancha",              desc:"Su estación y producción · reporta a Ensamble"},
+  plancha:  {nom:"Plancha",              desc:"Su estación · reporta su estado a Ensamble"},
   ensamble: {nom:"Parrilla / Ensamble",  desc:"Su estación · comunica el estado de COCINA"},
   servicio: {nom:"Mesero / Servicio",    desc:"Salón, clientes y servicio"},
   caja:     {nom:"Cajero / Encargado",   desc:"Caja y pedidos · valida el punto"}
@@ -338,10 +338,12 @@ const LISTAS = {
       ["Paredes y piso de la estación",0],["Faltantes y novedades reportados",0]]
   },
   ensamble:{
-    apertura:[["Lavado de manos y uniforme",0],["Parrilla encendida y en temperatura",1],
-      ["Salsas listas (BBQ, guacamole, Rústika, jalapeños, cebolla)",0],
-      ["Vegetales preparados (tomate, cilantro, lechuga)",0],
-      ["Mesa de ensamble organizada y toppings surtidos",0]],
+    /* Recorrido real de preparación. Un control por etapa, no uno por insumo. */
+    apertura:[["Estación de ensamble montada (pinzas, cuchillos, cucharas de madera y demás utensilios)",0],
+      ["Estación abastecida (salsas, guacamole, toppings, cebolla encurtida, jalapeño, quesos)",0],
+      ["Verduras necesarias preparadas (lechuga, tomate en cubos, rodajas para hamburguesa)",0],
+      ["Parrilla preparada (encendida y en temperatura)",1],
+      ["Arepas iniciales adelantadas",0]],
     cierre:[["Crudo y cocido separados",1],["Parrilla y mesa de ensamble limpias",0],
       ["Toppings guardados y tapados",0],["Neveras organizadas",0],["Piso trapeado",0]]
   },
