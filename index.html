@@ -991,6 +991,21 @@ function computeAlertas(){
     if(fl) add("falla_sistema","caja","Falla de sistema o medio de pago: "+fl.nota,"alta",fl.at);
   }
 
+  /* Produccion que administracion indico y no se hizo. Se juzga solo cuando
+     cocina cierra: antes de eso todavia queda turno para hacerla, y avisar
+     a media tarde de algo que se produce en la noche seria puro ruido. */
+  const cerroCocina = COCINA.filter(r=>remote[r] && remote[r].confirmado.cierre);
+  if(cerroCocina.length){
+    const faltan = planHoy().filter(it=>!produccion[it.p]);
+    if(faltan.length){
+      const at = Math.max.apply(null, cerroCocina.map(r=>remote[r].confirmado.cierre.at));
+      add("produccion_pendiente",null,
+        "Cocina cerró sin registrar "+(faltan.length===1?"una producción indicada":faltan.length+" producciones indicadas")+" para hoy: "
+        +faltan.map(x=>x.p+" ("+x.pax+" PAX)").join(" · ")+".","alta",at);
+      A[A.length-1].estacion="Cocina";
+    }
+  }
+
   if(validacion){
     if(validacion.estado!=="listo")
       add("apertura_con_novedad",null,"Operación iniciada con novedad abierta"+(validacion.faltan&&validacion.faltan.length?(": "+validacion.faltan.join(" · ")):"")+". Validó "+validacion.por+".","alta",validacion.at);
@@ -1271,6 +1286,7 @@ function tipoNom(t){
     falla_sistema:"Falla de sistema o pagos",
     apertura_con_novedad:"Apertura con novedad abierta",
     validacion_tarde:"Punto sin validar",
+    produccion_pendiente:"Producción indicada sin registrar",
     marcacion_bloque:"Marcación en bloque"
   })[t]||t;
 }
